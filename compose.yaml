@@ -197,9 +197,10 @@ services:
       - ${EXPORT_DIR:-./exports}:/srv/keyup/exports
       # Read-only: the health check's "backup overdue" looks at the newest manifest
       # deploy/backup/keyup-db-backup.sh wrote (app/health.py, docs/OPERATIONS.md §7).
-      # Compose creates the host directory if it is missing; an empty one reads as "no
-      # backup yet", which is true.
-      - ${BACKUP_DIR:-./backups/db}:/srv/keyup/backups/db:ro
+      # The default is the backup script's own default (KEYUP_BACKUP_DIR), so the two agree
+      # out of the box.  Compose creates the host directory if it is missing; an empty one
+      # reads as "no backup yet", which is true.
+      - ${BACKUP_DIR:-/srv/keyup/backups/db}:/srv/keyup/backups/db:ro
     depends_on:
       api:
         condition: service_healthy
@@ -369,7 +370,7 @@ services:
         required: false
     environment:
       # OpenVINO-format model: a HF repo id or a path under /models.
-      OV_MODEL: ${OV_MODEL:-OpenVINO/whisper-large-v3-turbo-int8-ov}
+      OV_MODEL: ${OV_MODEL:-OpenVINO/whisper-medium-fp16-ov}
       # CPU | GPU | NPU | AUTO.  GPU is the safe default; NPU has model constraints (§NPU
       # caveats in docs/STT.md).
       OV_DEVICE: ${OV_DEVICE:-GPU}

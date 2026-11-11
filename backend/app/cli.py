@@ -686,7 +686,7 @@ def repair_self_duplicates_cmd(
     The exact-hash rung applied its exclusion list to the row it found and not to the
     primary that row resolves to, so a call whose bytes were stored twice matched its own
     copy, followed it back to itself, tied with itself, and was written
-    ``duplicate_of = <its own id>`` — 18,708 rows on production, every one hidden from
+    ``duplicate_of = <its own id>`` — tens of thousands of rows on a large archive, every one hidden from
     every listing, taken out of its conversation, and (when its transcript was still
     pending) marked ``skipped`` with its jobs cancelled.
 
@@ -735,9 +735,9 @@ def repair_far_hash_duplicates_cmd(
     The exact-hash rung read an identical ``sha256`` as proof of the same transmission
     whatever the time.  Identical bytes only prove the same *recording*, and a short
     recording with no voice in it — a squelch tail, 0.14-2 s — encodes to byte-identical
-    MP3 bytes every time, so one hash spreads across hundreds of unrelated calls.  Call
-    2250773, a 1.7 s unit call on 2026-09-08, was ruled a duplicate of a 1.7 s group call
-    on talkgroup 2 from 2026-08-31 — 927 rows on production, one hash covering 155 of them,
+    MP3 bytes every time, so one hash spreads across hundreds of unrelated calls.  A 1.7 s
+    unit call could be ruled a duplicate of a 1.7 s group call on another talkgroup a week
+    earlier — hundreds of rows on a large archive, one hash covering over a hundred of them,
     every one hidden from every listing.
 
     This clears ``duplicate_of`` on the rows whose primary started more than ``--max-skew-s``
@@ -884,9 +884,9 @@ def refile_audio_cmd(
 ) -> None:
     """Move pushed recordings into the partition their own ``started_at`` names.
 
-    The archive files a push under ``uploads/YYYY/MM/DD/`` — and until this branch, that
+    The archive files a push under ``uploads/YYYY/MM/DD/`` — and in older versions that
     date came from the form *before* the recording was parsed, so a backlog migration piled
-    972,347 files into ``uploads/2026/09/01`` and 82,174 into ``uploads/2026/08/31``.  Run
+    hundreds of thousands of files into the one directory of the upload day.  Run
     this once after ``fix-upload-timestamps``, which is what put the true 2022-2024 dates on
     those rows in the first place; the layout is the only thing still holding the upload
     date.

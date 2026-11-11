@@ -487,8 +487,8 @@ def test_the_overview_counts_the_calls_nobody_spoke_on(client, session, archive)
         started_local=started.replace(tzinfo=None),
         ended_at=started + timedelta(seconds=0.648),
         duration_s=Decimal("0.648"),
-        file_path="kerchunk/2395971.mp3",
-        file_name="2395971.mp3",
+        file_path="kerchunk/1000001.mp3",
+        file_name="1000001.mp3",
         audio_meta={"content": "none", "speech_s": 0.04, "speech_floor_db": -40.0},
     )
     session.add(recent)

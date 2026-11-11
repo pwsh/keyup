@@ -30,8 +30,8 @@ PATCH_NO_NAME = "20260828/EXAMPLE INTEROP 1/20260828_232527_Example-System_Centr
 SHORTEST = "20260829/EXAMPLE EVENT 1/20260829_141703_Example-System_Central_T-Control__TO_1701_FROM_9200006.mp3"
 LONGEST = "20260829/EXAMPLE LAW 1/20260829_200945_Example-System_Central_T-Control__TO_1601_FROM_9200102.mp3"
 #: pre-2025 sdrtrunk: no underscore after the time, and the system's space is an
-#: underscore rather than a dash.  The shape of the production archive's backlog — this
-#: exact shape is 1,041,258 rows of it (docs/MIGRATION.md, "Timestamps").
+#: underscore rather than a dash.  The shape of a large real backlog — this
+#: exact shape was a million rows of it (docs/MIGRATION.md, "Timestamps").
 LEGACY = "20240223_210414Example_System_Central_T-Control__TO_1102_FROM_5226020.mp3"
 
 

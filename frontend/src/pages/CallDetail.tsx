@@ -87,14 +87,47 @@ import { toast } from "../state/toasts";
  */
 const RAW_META_LABELS: Record<string, string> = {
   algorithm: "Encryption algorithm",
+  decoder: "Decoder",
   durationMs: "Duration (ms)",
   keyId: "Key ID",
+  mode: "Mode",
   nac: "NAC",
+  offsetHz: "Carrier offset (Hz)",
+  peakDeviationHz: "Peak deviation (Hz)",
   recorder: "Recorder",
   site: "Site",
+  snrDb: "SNR (dB)",
+  squelchReason: "Squelch closed",
   systemLabel: "System",
   talkgroupLabel: "Talkgroup",
+  tone: "Squelch tone (configured)",
+  toneDetected: "Squelch tone (detected)",
 };
+
+/**
+ * What an analog conventional channel's recorder said about the call: trunkd sends `mode`
+ * (`nbfm`), the configured CTCSS/DCS squelch tone and the one it actually heard. `null`
+ * when the recorder said nothing of the kind — every P25 call, and every older one.
+ */
+function analogFacts(
+  meta: Record<string, unknown> | null | undefined,
+): { mode: string; tone: string | null; toneDetected: string | null } | null {
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim()
+      ? value.trim()
+      : typeof value === "number"
+        ? String(value)
+        : null;
+  const mode = text(meta?.mode);
+  if (!mode) return null;
+  return { mode: mode.toUpperCase(), tone: text(meta?.tone), toneDetected: text(meta?.toneDetected) };
+}
+
+function analogTip(facts: NonNullable<ReturnType<typeof analogFacts>>): string {
+  const configured = facts.tone ? `squelch tone ${facts.tone}` : "carrier squelch (no tone configured)";
+  const heard = facts.toneDetected ? `, heard ${facts.toneDetected}` : "";
+  return `${HELP["call.header.analogMode"]} — ${configured}${heard}`;
+}
 
 function rawMetaEntries(meta: Record<string, unknown>, id3: Record<string, string>): [string, string][] {
   const source = Object.keys(meta).length ? meta : id3;
@@ -186,6 +219,7 @@ export function CallDetail() {
     () => (detail ? rawMetaEntries(detail.raw.raw_meta, detail.raw.id3) : []),
     [detail],
   );
+  const analog = analogFacts(detail?.raw.raw_meta);
 
   // `CallDetail.conversation` is the conversation *record*; its calls come from
   // `GET /conversations/{id}`, which is one extra request but keeps the call
@@ -323,7 +357,8 @@ export function CallDetail() {
         detail.emergency ||
         detail.encrypted ||
         detail.tone_detected ||
-        detail.audio_type ? (
+        detail.audio_type ||
+        analog ? (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-4 py-2">
             {detail.patch_label ? (
               <span className="text-xs font-medium text-ink-2">{detail.patch_label}</span>
@@ -371,6 +406,15 @@ export function CallDetail() {
               <Tip label={HELP["call.header.audioType"]}>
                 <span className="rounded border border-line px-1.5 py-0.5 text-[11px] text-ink-2">
                   {detail.audio_type}
+                </span>
+              </Tip>
+            ) : null}
+            {/* An analog conventional channel: the mode, and the squelch tone it heard (or
+                the one it was set to), which is what says whose radio this was. */}
+            {analog ? (
+              <Tip label={analogTip(analog)}>
+                <span className="rounded border border-line px-1.5 py-0.5 text-[11px] text-ink-2">
+                  {[analog.mode, analog.toneDetected ?? analog.tone].filter(Boolean).join(" · ")}
                 </span>
               </Tip>
             ) : null}

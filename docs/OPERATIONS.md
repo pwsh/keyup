@@ -404,10 +404,10 @@ tables, 5,213,197 calls in the snapshot. The dump's backend ran at nice 19; load
 peaked at 5.6 on 6 cores; uploads kept answering in ~200 ms.
 
 **Point the worker at the same directory.** The `backup_stale` health check (§7.4) reads the
-manifests through a read-only mount of `BACKUP_DIR` from `.env`, which defaults to
-`./backups/db` beside `compose.yaml`; the script writes to `KEYUP_BACKUP_DIR`, default
-`/srv/keyup/backups/db`. Set `BACKUP_DIR=/srv/keyup/backups/db` in `.env` (or set both to
-another path) and `docker compose up -d`; otherwise the check looks at an empty directory
+manifests through a read-only mount of `BACKUP_DIR` from `.env`; the script writes to
+`KEYUP_BACKUP_DIR`. Both default to `/srv/keyup/backups/db`, so out of the box they agree.
+If you move the dumps, set `BACKUP_DIR` in `.env` and `KEYUP_BACKUP_DIR` in the service to
+the same path and `docker compose up -d`; otherwise the check looks at an empty directory
 and reports "no database backup … yet".
 
 Install the timer (once, on the host, as root). The unit runs the script from the checkout
@@ -492,7 +492,7 @@ runtime settings (Admin → Settings → Health); 0 switches a check off.
 | `recorder_silent:<instance>` | a **hot** recorder has not reported (warm spares and cold boxes are ignored) | 5 min |
 | `ingest_lag` | no call at all recorded (longest real quiet in 14 days: 13.5 min) | 20 min |
 | `stt_backlog` | the oldest live-band transcription job — queued and due, or parked by an STT outage — has waited this long; backlog-band work never counts | 30 min |
-| `backup_stale` | the newest manifest in `BACKUP_DIR` is older than this (skipped if the directory is not mounted into the worker; compose mounts `.env`'s `BACKUP_DIR`, default `./backups/db`, read-only — §7.2) | 30 h |
+| `backup_stale` | the newest manifest in `BACKUP_DIR` is older than this (skipped if the directory is not mounted into the worker; compose mounts `.env`'s `BACKUP_DIR`, default `/srv/keyup/backups/db`, read-only — §7.2) | 30 h |
 
 Disk space is the separate `disk_low` alert (`app/disk_watch.py`).
 

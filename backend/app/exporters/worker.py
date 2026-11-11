@@ -560,7 +560,7 @@ class ExportWorker:
             base_af = None if processed or not _export_normalize(settings) else ffmpeg_audio_filter(settings)
             # …and the tone envelope back on after that lift: a call that is nothing but an
             # attenuated tone measures as a quiet call, and the export target would hand the
-            # service a page louder than the file we stored (call 2396243).
+            # service a page louder than the file we stored (the tone-only call).
             af = export_filter(
                 base_af,
                 settings,

@@ -108,7 +108,7 @@ SPEECH_MIN_SILENCE_S = 0.05
 
 #: What ``audio_meta.content`` can say.  ``speech`` is the ordinary answer.  ``page`` is a
 #: call that is *only* a pager tone-out and is content all the same — production calls
-#: 2396355/2396357 are 4.25 s fire dispatch pages, an A tone of about a second then a B tone
+#: the tone-out pair are 4.25 s fire dispatch pages, an A tone of about a second then a B tone
 #: of about 2.75, and not one word: they are the most important audio on the system.  ``none``
 #: is a recording with nothing in it worth transcribing, exporting or keeping — a mic key-up
 #: with no words behind it ("kerchunk"), which trunkd records as faithfully as a sentence.
@@ -118,7 +118,7 @@ SPEECH_MIN_SILENCE_S = 0.05
 #: squelch tail or a failed decode rather than a quiet talker.  It has to be its own value
 #: because the measure that finds the others cannot see it — :func:`speech_seconds` counts
 #: seconds above a floor on the *processed* copy, and static lifted 25 dB by the gain stage
-#: clears that floor for its whole length, so production calls 2403008, 2402904 and 2402672
+#: clears that floor for its whole length, so the three static calls
 #: were all stored ``speech`` with 0.4-1.3 s of "speech" in them.  What separates it is
 #: :func:`flat_fraction`.  It is handled exactly like ``none`` — never transcribed, never
 #: exported, discarded with the rest — and is a separate name only so the archive can say
@@ -151,7 +151,7 @@ FLATNESS_LIVE_DB = -60.0
 
 #: …and the level half of the static rule.  A clip louder than this is somebody talking,
 #: whatever its spectrum looks like: the two known-good calls whose flatness comes closest
-#: to a static one (2405803/2405804, the same transmission recorded twice, flat-frac 0.74)
+#: to a static one (the quiet duplicate pair, the same transmission recorded twice, flat-frac 0.74)
 #: sit at -19 dBFS and are excluded on level alone.  The level term is what carries the
 #: rule — the flatness margin on its own is only about 0.05.
 STATIC_MAX_LEVEL_DB = -35.0
@@ -443,7 +443,7 @@ def speech_seconds(
     """How many seconds of ``path`` are above ``floor_db`` — the *speech content* measure.
 
     ``silent`` (``audio_silent_below_db``, -60 dBFS) asks whether the whole clip is quiet,
-    and a mic key-up answers no: production calls 2395971/2395972 are 0.35 s at -80 dB
+    and a mic key-up answers no: the key-up pair are 0.35 s at -80 dB
     followed by one 30 ms click at -22 dB, which averages -50 dB and clears the silence
     floor comfortably.  Nobody said anything.  The question that separates them is not how
     loud the clip is but *how much of it* is loud, which is what this counts.
@@ -457,7 +457,7 @@ def speech_seconds(
 
     ``exclude`` is stretches that are loud but are **not speech** — the tone spans, in this
     same processed timebase.  A page or a console attention tone is above the floor by a wide
-    margin, and without this a tone-only call (production 2396243: 2.0 s of 993 Hz and
+    margin, and without this a tone-only call (2.0 s of 993 Hz and
     nothing else) measures two seconds of "speech" and is transcribed, exported and kept.
     """
     floor = float(floor_db)
@@ -525,9 +525,9 @@ def flat_fraction(
 
     **Measured on the recorder's own file, not on the processed copy.**  That is not a
     detail: measured on the processed copy the rule stops working entirely.  The chain
-    lifts a static clip 24-30 dB, so 2403008/2402904/2402672 come off it at -28.1 to
+    lifts a static clip 24-30 dB, so the three static calls come off it at -28.1 to
     -29.0 dBFS — above :data:`STATIC_MAX_LEVEL_DB`, which flags **none** of the three —
-    while a real quiet call (2405911) rises to 0.72 flat and starts looking like one.  The
+    while a real quiet call rises to 0.72 flat and starts looking like one.  The
     raw decode is also the one :func:`measure` already has in hand, so this costs an FFT
     over a couple of seconds of audio and no extra decode.
 

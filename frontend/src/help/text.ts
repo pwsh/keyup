@@ -252,6 +252,8 @@ export const HELP_TEXT = {
   "call.header.encrypted":
     "The traffic was encrypted, so there is no audio — the call is kept because it still shows the channel was in use",
   "call.header.audioType": "How the transmission was carried on the air: analog, digital, or digital TDMA",
+  "call.header.analogMode":
+    "An analog conventional channel (narrowband FM), recorded on its own frequency rather than from a trunked system",
   "call.duplicates":
     "The other recorders' copies of this same transmission. Keyup keeps the best one as the call you are looking at and hides the rest behind it",
   "call.duplicates.recorder": "Which recorder produced this copy",

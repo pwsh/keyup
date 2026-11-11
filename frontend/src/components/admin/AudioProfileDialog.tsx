@@ -324,7 +324,7 @@ export function AudioProfileDialog({
                 type="number"
                 inputMode="numeric"
                 value={previewCall}
-                placeholder="1103864"
+                placeholder="123456"
                 onChange={(event) => setPreviewCall(event.target.value)}
                 className={`${inputClass} w-40`}
               />

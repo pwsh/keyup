@@ -1,7 +1,7 @@
 """Sustained-tone detection on decoded PCM (ARCHITECTURE §5.5).
 
-A dispatch page is not a transmission like the others.  On this system it is two pure
-tones back to back — call 1103864 on FIRE DISPATCH carries 625 Hz from 1.15 s to 2.11 s
+A dispatch page is not a transmission like the others.  On many systems it is two pure
+tones back to back — the two-tone page call on FIRE DISPATCH carries 625 Hz from 1.15 s to 2.11 s
 and then 750 Hz from 2.18 s to 5.09 s before anybody speaks — and a listener scrubbing a
 day of traffic wants to find exactly those, while a transcriber wants them out of the way.
 Both needs come from the same measurement, so it is made once, here, and recorded on the
@@ -32,9 +32,9 @@ time — over seven days this detector flagged 291 calls ``single``, most of the
 at 300-600 Hz, which is a voice — while a real warble alternates two frequencies every
 quarter second and so was never caught by a 0.3 s floor at all.  What actually separates
 them is **stability**: an encoder holds its frequency to a fraction of a hertz for the
-whole run, and a voice does not.  Measured on call 1169412's 878 Hz halves the 90th
-percentile deviation from the run's median is 0.0-0.8 Hz; measured on the vowel call
-1170568 flagged as a tone it is 18-25 Hz, and the neighbouring runs of the same vowel come
+whole run, and a voice does not.  Measured on the partial-warble call's 878 Hz halves the 90th
+percentile deviation from the run's median is 0.0-0.8 Hz; measured on the vowel of
+the held-vowel call, flagged as a tone, it is 18-25 Hz, and the neighbouring runs of the same vowel come
 out at 410, 492 and 399 Hz.  So :data:`MAX_FREQ_SPREAD_HZ` is the gate, and duration is
 then applied *by context*:
 
@@ -50,15 +50,15 @@ then applied *by context*:
     an isolated tone has no pattern behind it, so it has to be long *and* clean.  This is
     the rule the 291 false positives fail.
 ``on its own and held for a second: >= 1.0 s, >= 45 % dominant, spread <= 20 Hz``
-    the second way to be isolated, and the one call 2394781 needed.  Its tone is 1.41 s of
+    the second way to be isolated, and the one the held-tone call needed.  Its tone is 1.41 s of
     a single 993.8 Hz pitch at -14 dBFS, 0.87 dominant — but the peak wanders 18.3 Hz
     (p90), an order of magnitude past :data:`MAX_FREQ_SPREAD_HZ`, because a vocoder does
     not reproduce a tone's frequency the way an encoder generates it.  Held to 6 Hz that
     run is not a tone at all; held to nothing it is a vowel.  What makes it one is the two
     together: **a full second inside +/-20 Hz**.  The spread on its own decides nothing
-    here — the false-positive vowel of call 1170568 measures 18.4 Hz, which is the same
+    here — the false-positive vowel of the held-vowel call measures 18.4 Hz, which is the same
     number — and neither does the duration on its own.  The 7-day false-positive
-    population peaked at 0.3-0.4 s and 1170568's own runs are 0.38 s and 0.16 s, so a
+    population peaked at 0.3-0.4 s and the held-vowel call's own runs are 0.38 s and 0.16 s, so a
     second is three times past all of it, and no voice holds one pitch that long that
     closely.  :data:`MIN_SINGLE_FRACTION` is relaxed to :data:`MIN_DOMINANT_FRACTION` on
     this path only: the stability is carrying the evidence the extra dominance carried on
@@ -67,9 +67,9 @@ then applied *by context*:
 **Harmonics were tried and rejected.**  A vocoded tone spreads into its own harmonics, so
 folding the energy at 2x and 3x the peak back into the dominance fraction looks like it
 should help.  Measured over the fixtures it helps the wrong call: it lifts nine frames of
-the *vowel* in 1170568 over the frame test and not one frame of the tone in 2394781, whose
-frames are 0.98 dominant already.  Speech is harmonic too, and the peak of a voiced frame
-is usually itself a harmonic, so 2x and 3x of it land on more voice.  The dominance
+the *vowel* in the held-vowel call over the frame test and not one frame of the tone in
+the held-tone call, whose frames are 0.98 dominant already.  Speech is harmonic too, and
+the peak of a voiced frame is usually itself a harmonic, so 2x and 3x of it land on more voice.  The dominance
 fraction stays the single bin and its two leakage neighbours.
 
 Frames are 32 ms with 50 % overlap, so the shortest reportable tone is measured by about
@@ -78,7 +78,7 @@ nine of them and its edges land within 16 ms.
 **What comes out.**  ``segments`` is every accepted run, for the UI; ``spans`` is the same
 runs merged one span per pattern (plus :data:`SPAN_MARGIN_S` either side), which is what
 the attenuation is built from — attenuating only the halves that passed would punch the
-gaps of a warble through untouched, which is exactly what call 1169412 sounded like.
+gaps of a warble through untouched, which is exactly what the partial-warble call sounded like.
 """
 
 from __future__ import annotations
@@ -137,20 +137,20 @@ MIN_SINGLE_FRACTION = 0.55
 #: The second way an isolated run can be a tone: held this long, at
 #: :data:`MIN_DOMINANT_FRACTION`, inside :data:`MAX_SINGLE_SPREAD_HZ`.  A second is three
 #: times the 0.3-0.4 s the false-positive population peaked at and past the longest run in
-#: the vowel call 1170568 (0.38 s), which is what makes the wider spread safe to allow.
+#: the held-vowel call (0.38 s), which is what makes the wider spread safe to allow.
 MIN_STABLE_SINGLE_TONE_S = 1.0
 #: How far the peak of a *second-long isolated* run may wander and still be a tone.  Much
 #: wider than :data:`MAX_FREQ_SPREAD_HZ` because it is measuring something else: that limit
 #: separates an encoder from a voice inside a third of a second, where a voice is already
 #: moving, while this one asks only that a pitch stay put for a second, which a voice never
-#: does at any width.  Call 2394781's vocoded 993.8 Hz tone measures 18.3 Hz here.
+#: does at any width.  The held-tone call's vocoded 993.8 Hz tone measures 18.3 Hz here.
 MAX_SINGLE_SPREAD_HZ = 20.0
 #: Each tone of a two-tone pair.  Quik-Call II's A tone is about a second and its B tone
 #: several, so this only excludes a pair of blips that happen to be 50 Hz apart.
 MIN_PAIR_TONE_S = 0.4
 #: How far a run's frequency may wander and still be an encoder rather than a voice: the
 #: 90th percentile of |f - median(f)| over the run's frames.  A stable tone measures under
-#: 1 Hz (call 1169412: 0.0-0.8 Hz); a vowel measures 18-25 Hz (call 1170568).  Six hertz is
+#: 1 Hz (the partial-warble call: 0.0-0.8 Hz); a vowel measures 18-25 Hz (the held-vowel call).  Six hertz is
 #: an order of magnitude clear of the tones and a third of the way to the voices, which
 #: leaves room for the parabolic interpolation to wobble on a tone riding a noisy channel.
 MAX_FREQ_SPREAD_HZ = 6.0
@@ -160,7 +160,7 @@ MAX_FREQ_SPREAD_HZ = 6.0
 MAX_PATTERN_GAP_S = 0.15
 #: The longest silence inside a *repeated* pattern — one frequency struck three or more
 #: times, which is what an evacuation tone is and what a warble degrades to when only the
-#: high halves clear the dominance test (call 1169412: four 878 Hz halves 0.2 s apart, the
+#: high halves clear the dominance test (the partial-warble call: four 878 Hz halves 0.2 s apart, the
 #: 467.9 Hz halves between them too weak to be seen).  Wider than
 #: :data:`MAX_PATTERN_GAP_S` because the gap here is a real silence, and safe to widen
 #: because the frequency has to be *the same* each time, which speech does not do.
@@ -258,7 +258,7 @@ class ToneReport:
     #: One entry per *pattern*, first start to last end plus :data:`SPAN_MARGIN_S`.  This is
     #: what the filter chain attenuates or cuts; ``segments`` is the detail behind it.  A
     #: warble is one span, not six, because the quiet halves between its tones are part of
-    #: the same noise to a listener and leaving them at full level is what call 1169412
+    #: the same noise to a listener and leaving them at full level is what the partial-warble call
     #: sounded like.
     spans: tuple[ToneSegment, ...] = ()
     #: one of :data:`PATTERNS`
@@ -415,7 +415,7 @@ def _close(  # noqa: PLR0913 - a private accumulator, not an interface
         return
     median = float(np.median(freqs))
     # The 90th percentile rather than the standard deviation: one transitional frame at
-    # either edge of a real tone lands far away and would triple an sd (call 1169412's
+    # either edge of a real tone lands far away and would triple an sd (the partial-warble call's
     # first half measures sd 4.0 Hz and p90 0.1 Hz).  The percentile ignores it and still
     # answers "did this frequency hold" for the frames that matter.
     spread = float(np.percentile(np.abs(np.asarray(freqs) - median), 90)) if freqs else 0.0
@@ -455,7 +455,7 @@ def _absorb(
 ) -> list[_Run]:
     """Pull the pattern's own frayed edges back in.
 
-    A warble fading out ends in halves whose frequency measurement is noisy — call 1170733
+    A warble fading out ends in halves whose frequency measurement is noisy — the fading-warble call
     finishes with two at 7.6-8.2 Hz spread against 0.1-0.6 Hz for the rest — and dropping
     them would shorten the attenuation span short of the sound.  A run adjacent to an
     already-established pattern, at one of the frequencies that pattern is already
@@ -467,7 +467,7 @@ def _absorb(
     hop — so two runs that are consecutive in frame numbering report end and start times
     that overlap by exactly one hop (16 ms at the 32 ms / 50 % frames this module uses).
     Testing the gap against zero therefore rejected the very edges this function exists to
-    recover: production call 2403028 is a 878.1/467.9 Hz warble running 1.224 s to 4.312 s
+    recover: the truncated-warble call is a 878.1/467.9 Hz warble running 1.224 s to 4.312 s
     whose span stopped at 3.064 s, leaving 1.25 s of un-attenuated tone that came out of
     the chain 4.6 dB *louder* than the speech behind it.  ``overlap_s`` is that hop, and
     nothing wider: a genuinely overlapping pair of runs is one run the frame loop split,

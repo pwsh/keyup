@@ -172,7 +172,7 @@ class OpenAICompatibleBackend:
                     )
                 except httpx.ReadTimeout as exc:
                     # The server took the upload and then sat on it for the whole deadline.
-                    # Not retried here: see RequestTimeoutError.  (2026-09-23: call 5237413
+                    # Not retried here: see RequestTimeoutError.  (The looping BOLO call
                     # held a slot for 3 x 120 s on each of three servers, every round.)
                     log.warning(
                         "stt %s: no answer within %.0fs (attempt %d); not retrying on this server",

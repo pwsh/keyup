@@ -323,7 +323,7 @@ export function AudioTab({ canWrite }: { canWrite: boolean }) {
                 type="number"
                 inputMode="numeric"
                 value={callId}
-                placeholder="1103864"
+                placeholder="123456"
                 onChange={(event) => setCallId(event.target.value)}
                 className={`${inputClass} w-40`}
               />

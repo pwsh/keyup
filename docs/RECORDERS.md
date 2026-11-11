@@ -78,7 +78,7 @@ worked by string-matching the response body; Keyup implements that contract lite
 travels in the form body of every call:
 
 ```sh
-docker compose exec worker keyup token create sdrtrunk --scopes upload
+docker compose exec api keyup token create sdrtrunk --scopes upload
 # {"id": 3, "label": "sdrtrunk", "scopes": ["upload"], "token": "kup_…"}   ← shown once
 ```
 
@@ -162,8 +162,8 @@ Three settings matter more than they look:
   and the other is not a second call.
 - **`hideEncrypted: false`** leaves a sidecar behind for encrypted calls, which have no
   audio at all. Keyup ingests those too, with `audio_state='purged'`: the row proves an
-  agency held that talkgroup at that second, which is exactly what the correlation API
-  (§4.6) is asked for, and it costs a few hundred bytes.
+  agency held that talkgroup at that second, which is exactly what an outside system
+  linking incidents to calls (ARCHITECTURE §4.6) asks for, and it costs a few hundred bytes.
 
 trunk-recorder writes the audio first and the sidecar a moment later, so a call is held for
 up to `TR_SIDECAR_WAIT_SECONDS` before it is ingested. If the sidecar never comes the call
@@ -225,7 +225,7 @@ run the script again. **Admin → Recorder → Connect a recorder** does the sam
 browser. By hand, mint it the same way as for the other recorders:
 
 ```sh
-docker compose exec worker keyup token create trunkd --scopes upload
+docker compose exec api keyup token create trunkd --scopes upload
 # {"id": 4, "label": "trunkd", "scopes": ["upload"], "token": "kup_…"}   ← shown once
 ```
 
@@ -309,7 +309,7 @@ command reports `no system named 'upload' — nothing to do`.
 ### Repairing backlog timestamps
 
 The phantom system's sibling, and from the same push (docs/MIGRATION.md, "Timestamps"): a
-parser that rejected every pre-2025 sdrtrunk filename left **1,041,258 backlog calls stamped
+parser that rejected every pre-2025 sdrtrunk filename left **a million backlog calls stamped
 with the day they were uploaded**, then deduped and threaded against each other on those
 invented times. `keyup fix-upload-timestamps` puts them back, from the filename each row still
 carries.
@@ -398,11 +398,25 @@ browser is later handed.
 | `sourceQuality` | JSON: which receiver this is and how well it heard the call — see *Best source* below |
 | `call_kind` | `group` (default, and what every recorder sent before this existed) or `unit` — see *Unit-to-unit calls* below |
 | `target_radio_id` | **unit calls only**: the radio the private call was addressed to |
+| `mode`, `decoder` | **conventional channels only**: `nbfm`, `NBFM` — the call is analog narrowband FM → `raw_meta`, and `decoder` → `calls.decoder` |
+| `tone`, `toneDetected` | conventional: the configured and the detected CTCSS/DCS squelch tone (e.g. `192.8`, `D445N`) → `raw_meta`, shown on the call page |
+| `squelchReason`, `snrDb`, `peakDeviationHz`, `offsetHz` | conventional: why squelch closed, and what the channel measured → `raw_meta` |
 
 **`recorder=trunkd` is the only thing that separates trunkd from trunk-recorder.** The two
 forms are otherwise identical, and Keyup does not guess: without that field a trunkd call is
 filed as `ingest_source='trunk_recorder'`, which is not wrong about the dialect but is wrong
 about the recorder. Set it.
+
+**Analog conventional channels.** trunkd sends a conventional-channel call as an ordinary
+group call on the channel's own system label and (synthetic) talkgroup, with no keying radio
+(`sources=[]`), plus `mode=nbfm` and `decoder=NBFM`. `decoder` is used as the **protocol of a
+system this push creates** — so a system first seen from a conventional channel is `NBFM`,
+which is not trunked — and never fills in or changes the protocol of a system that already
+exists (a P25 system's label reused for a channel keeps its protocol). A name or ID3 frame
+that names a decoder still wins over the form. **Analog calls are never sent to a
+trunked-only exporter (Broadcastify Calls)**: the export gate refuses any call whose
+`raw_meta` says `mode`/`decoder` `nbfm`, whatever its system, as well as every call on a
+system that is not trunked (docs/EXPORTERS.md). The Broadcastify Feed and OpenMHz take them.
 
 ### Unit-to-unit calls
 
@@ -474,8 +488,8 @@ The row is written with `audio_state='purged'` — the same vocabulary the trunk
 sidecar path uses for the same fact (§3) — `duration_s` from `durationMs` (`0` when trunkd
 did not time it), `time_source='upload'`, and every talkgroup, radio, site, patch and
 `raw_meta` field the form carried. `GET /calls/{id}/audio` answers `410 Gone` rather than
-inventing a file, nothing is queued for transcription, and the correlation API (§4.6 of the
-architecture) still sees that an agency held that talkgroup at that second — which is the
+inventing a file, nothing is queued for transcription, and the calls API (and anything linking
+outside records to calls, §4.6 of the architecture) still sees that an agency held that talkgroup at that second — which is the
 whole reason to keep the row.
 
 A **clear** call with no audio is still the recorder failing to send one:
@@ -1024,7 +1038,7 @@ without one), so "which rows came from the migration" stays answerable in SQL lo
 job is gone.
 
 **An accepted backlog call is stored immediately** — searchable, playable, in the archive,
-in the correlation API. Only its *transcription* waits behind live traffic.
+visible to API consumers. Only its *transcription* waits behind live traffic.
 
 ### Refusals
 
@@ -1217,15 +1231,17 @@ dedupe the same (0.06 ms), and the `file_path` uniqueness walk a `calls_file_pat
 Only the push paths need a credential, and the only scope they need is `upload`:
 
 ```sh
-docker compose exec worker keyup token create trunk-recorder --scopes upload
-docker compose exec worker keyup token create trunkd --scopes upload
-docker compose exec worker keyup token list
-docker compose exec worker keyup token revoke <id>
+docker compose exec api keyup token create trunk-recorder --scopes upload
+docker compose exec api keyup token create trunkd --scopes upload
+docker compose exec api keyup token list
+docker compose exec api keyup token revoke <id>
 ```
 
 `upload` permits exactly the recorder's own endpoints and nothing else: `POST /api/call-upload`,
 `GET /api/upload/flow`, `POST /api/upload/exists`, `GET /api/recorder/desired-state`, `POST /api/recorder/tuners/status`,
-`POST /api/recorder/spectrum`, `POST /api/recorder/observations` and `POST /api/recorder/events`. It cannot read the
+`POST /api/recorder/spectrum`, `POST /api/recorder/observations`, `POST /api/recorder/events`,
+`POST /api/recorder/event-log`, `POST /api/recorder/broadcastify/claim` and the `WS /api/recorder/stream`
+WebSocket. It cannot read the
 archive, edit anything, or stream the live feed. Give each recorder its own token so one can be
 revoked without silencing the others — the label shows up in the API log line for every
 call it imports. (`admin` also satisfies the endpoint, but a recorder should never hold it:

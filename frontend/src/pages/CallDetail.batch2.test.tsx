@@ -134,3 +134,44 @@ describe("one player per call (#20)", () => {
     expect(screen.getByTestId("call-playhead")).toHaveTextContent("1.0s / 7.0s");
   });
 });
+
+describe("analog conventional calls (trunkd NBFM channels)", () => {
+  const target = CALLS.find((entry) => entry.ingest_source === "trunk_recorder") as (typeof CALLS)[number];
+  const saved = { raw_meta: target.raw.raw_meta, audio_type: target.audio_type };
+
+  afterEach(() => {
+    target.raw.raw_meta = saved.raw_meta;
+    target.audio_type = saved.audio_type;
+  });
+
+  it("shows the mode and the squelch tone the recorder heard, and labels them in the raw panel", async () => {
+    target.audio_type = null;
+    target.raw.raw_meta = {
+      recorder: "trunkd",
+      mode: "nbfm",
+      decoder: "NBFM",
+      tone: "192.8",
+      toneDetected: "D445N",
+      snrDb: "21.5",
+    };
+    renderWithProviders(<CallDetail />, `/calls/${target.id}`, "/calls/:id");
+    expect(await screen.findByText("NBFM · D445N")).toBeInTheDocument();
+    (await screen.findByRole("tab", { name: "Raw metadata" })).click();
+    expect(await screen.findByText("Squelch tone (configured)")).toBeInTheDocument();
+    expect(screen.getByText("Squelch tone (detected)")).toBeInTheDocument();
+    expect(screen.getByText("Mode")).toBeInTheDocument();
+  });
+
+  it("falls back to the configured tone, and shows nothing for a call without a mode", async () => {
+    target.audio_type = null;
+    target.raw.raw_meta = { recorder: "trunkd", mode: "nbfm", tone: "110.9" };
+    const { unmount } = renderWithProviders(<CallDetail />, `/calls/${target.id}`, "/calls/:id");
+    expect(await screen.findByText("NBFM · 110.9")).toBeInTheDocument();
+    unmount();
+
+    target.raw.raw_meta = { recorder: "trunkd", nac: "0x4A3" };
+    renderWithProviders(<CallDetail />, `/calls/${target.id}`, "/calls/:id");
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByText(/NBFM/)).not.toBeInTheDocument();
+  });
+});

@@ -67,7 +67,7 @@ def silence(seconds: float, sample_rate: int = SR) -> np.ndarray:
 def warble(
     lo_hz: float, hi_hz: float, half_s: float, halves: int, *, amplitude: float = 0.5
 ) -> np.ndarray:
-    """Two frequencies alternating, the shape of calls 1170192 and 1170733."""
+    """Two frequencies alternating, the shape of the two missed warbles."""
     return np.concatenate(
         [tone(hi_hz if n % 2 == 0 else lo_hz, half_s, amplitude=amplitude) for n in range(halves)]
     )
@@ -140,7 +140,7 @@ def speechish(seconds: float, *, seed: int = 0, sample_rate: int = SR) -> np.nda
 
 class TestToneDetection:
     def test_two_tone_page_is_found_and_flagged_as_an_alert(self) -> None:
-        """Call 1103864's shape: 625 Hz then 750 Hz, then voice (ARCHITECTURE §5.5)."""
+        """The two-tone page call's shape: 625 Hz then 750 Hz, then voice (ARCHITECTURE §5.5)."""
         signal = np.concatenate(
             [silence(1.15), tone(625, 0.96), silence(0.07), tone(750, 2.91), speechish(5.0)]
         )
@@ -192,7 +192,7 @@ class TestToneDetection:
         assert len(report.spans) == 1
 
     def test_a_tone_just_under_the_isolated_floor_is_nothing(self) -> None:
-        """0.35 s at 492 Hz is call 1170568's shape — a vowel, and 291 of these in a week."""
+        """0.35 s at 492 Hz is the held-vowel call's shape — a vowel, and 291 of these in a week."""
         report = detect_tones(np.concatenate([silence(0.2), tone(492, 0.35), silence(0.2)]), SR)
         assert report.pattern == "none"
 
@@ -202,7 +202,7 @@ class TestToneDetection:
         assert detect_tones(signal, SR).pattern == "none"
 
     def test_a_wobbling_tone_held_a_full_second_is_a_single(self) -> None:
-        """The second `single` clause: call 2394781's shape, made synthetic.
+        """The second `single` clause: the held-tone call's shape, made synthetic.
 
         ±10 Hz of wobble measures past `MAX_FREQ_SPREAD_HZ`, so this run is not
         encoder-grade and can be no part of a pattern.  Held for 1.2 s it is still a tone —
@@ -297,7 +297,7 @@ class TestToneDetectionOnCallShapes:
     """
 
     def test_a_quiet_warble_is_attenuated_whole(self) -> None:
-        """The false negative (call 1170192's shape): 878/468 Hz every ~0.25 s, every half
+        """The false negative (the first missed warble's shape): 878/468 Hz every ~0.25 s, every half
         under the old floor."""
         report = detect_tones(fixture("warble_quiet"), SR)
         assert report.pattern == "warble"
@@ -310,7 +310,7 @@ class TestToneDetectionOnCallShapes:
         assert span.end_s == pytest.approx(4.31, abs=0.1)
 
     def test_a_warble_includes_its_fading_tail(self) -> None:
-        """Call 1170733's shape: its last halves fade and measure 7-10 Hz of spread, past
+        """The fading-warble call's shape: its last halves fade and measure 7-10 Hz of spread, past
         `MAX_FREQ_SPREAD_HZ`; the alternation carries them."""
         report = detect_tones(fixture("warble_fading_tail"), SR)
         assert report.pattern == "warble"
@@ -321,7 +321,7 @@ class TestToneDetectionOnCallShapes:
         assert span.end_s == pytest.approx(4.14, abs=0.1)
 
     def test_a_held_vowel_is_speech_and_nothing_else(self) -> None:
-        """The false positive (call 1170568's shape): a voiced vowel that used to be flagged
+        """The false positive (the held-vowel call's shape): a voiced vowel that used to be flagged
         492 Hz for 0.35 s.
 
         Attenuating it 24 dB punched a hole in the speech, which is what the operator heard
@@ -334,7 +334,7 @@ class TestToneDetectionOnCallShapes:
         assert report.alert is False
 
     def test_a_warble_is_covered_end_to_end_despite_its_missing_halves(self) -> None:
-        """The partial detection (call 1169412's shape): only the 878 Hz halves clear the
+        """The partial detection (the partial-warble call's shape): only the 878 Hz halves clear the
         level and dominance tests.
 
         Four of them 0.2 s apart is one frequency repeating, which is an `alert`, and the
@@ -351,7 +351,7 @@ class TestToneDetectionOnCallShapes:
 
 
     def test_a_wandering_single_the_tight_stability_limit_rejected(self) -> None:
-        """The second false negative (call 2394781's shape): 1.4 s of one vocoded 990 Hz
+        """The second false negative (the held-tone call's shape): 1.4 s of one vocoded 990 Hz
         tone, wandering about 18 Hz.
 
         Every frame is well over 0.55 dominant, so the old `>= 55 %` clause was never the
@@ -371,7 +371,7 @@ class TestToneDetectionOnCallShapes:
         assert span.end_s == pytest.approx(1.6, abs=0.05)
 
     def test_a_warble_is_absorbed_across_its_one_hop_overlaps(self) -> None:
-        """The truncated span (call 2403028's shape): 878/468 Hz alternating from 1.224 s to
+        """The truncated span (the truncated-warble call's shape): 878/468 Hz alternating from 1.224 s to
         4.312 s.
 
         Twelve runs, consecutive in frame numbering — and because a run's end is the end of
@@ -564,7 +564,7 @@ class TestFilterChain:
     def test_a_single_tone_span_is_attenuated_like_a_pair(self) -> None:
         """A lone held tone reaches the same kind of `volume` stage a page does.
 
-        A wandering single (call 2394781's shape) is one `single` span, and it has to be
+        A wandering single (the held-tone call's shape) is one `single` span, and it has to be
         turned down like any other — the loudness stage that follows is the reason: it
         would otherwise set the whole clip's gain from the tone.  Only the *depth* differs, and that is
         ``test_tones_are_turned_down_by_what_they_are``'s business.
@@ -585,7 +585,7 @@ class TestFilterChain:
 
         One chain, two spans, two depths.  A two-tone page is the *message* — somebody was
         toned out, and a listener wants to hear it under the dispatch that follows — where a
-        `single` is the held attention tone in front of the dispatch (call 2396065: 1.95 s of
+        `single` is the held attention tone in front of the dispatch (the attention-tone call: 1.95 s of
         993 Hz at -10.5 dBFS before 17 s of speech), which carries nothing and is only loud.
         """
         m = Measurement(duration_s=30.0, mean_db=-30.0, peak_db=-10.0)
@@ -932,7 +932,7 @@ class TestNothingClipsAfterTheCodec:
     """The ceiling has to survive the encode, which is the part that used to be missed.
 
     Production, one afternoon: 804 of about 930 processed calls stored
-    ``peak_db_after = 0.0``.  Call 2402902 came in peaking at -8.4 dBFS and its processed
+    ``peak_db_after = 0.0``.  The hot call came in peaking at -8.4 dBFS and its processed
     MP3 decoded at +0.01 dBFS with 153 samples over the limiter's ceiling.  Two causes,
     and either one alone is enough:
 
@@ -1054,7 +1054,7 @@ class TestTheGateFollowsTheClip:
     """`gate_threshold_db`: a threshold read off this clip rather than off the archive.
 
     Eighteen of the eighteen calls more than 6 dB below the archive's median level are on
-    the `volume` branch, and production 2405543 — asked for +30 dB — came out +16.1.  A
+    the `volume` branch, and the quiet call — asked for +30 dB — came out +16.1.  A
     threshold fixed at -50 dBFS and applied *before* the gain sits at or above the content
     of a call that arrived at -46, so the gate ducks the speech instead of the hiss.
     """
@@ -1101,7 +1101,7 @@ class TestTheGateDoesNotEatQuietCalls:
         return path
 
     def test_a_60_db_clip_on_the_volume_branch_keeps_its_content(self, tmp_path: Path) -> None:
-        """-60 dBFS speech, two seconds — the short branch, and the shape of 2405543.
+        """-60 dBFS speech, two seconds — the short branch, and the shape of the quiet call.
 
         With the gate fixed at -50 dBFS ahead of the gain this clip is 10 dB under the
         threshold for its whole length: measured, the old order came out **6.8 dB quieter
@@ -1206,7 +1206,7 @@ class TestStaticFlatness:
 
     Spectral flatness is the geometric mean of a frame's power spectrum over its arithmetic
     mean — 1.0 for white noise, near zero for a vowel, which puts its energy in formants
-    and leaves nulls between them.  Production 2403008, 2402904 and 2402672 measure
+    and leaves nulls between them.  The three static calls measure
     0.81-0.93 of their live frames flat; the twelve quietest real calls in the archive
     measure 0.02-0.20.
     """
@@ -1234,7 +1234,7 @@ class TestStaticFlatness:
 class TestStaticContent:
     """`content = static` end to end (§5.5).
 
-    Production 2403008 / 2402904 / 2402672 were all stored `speech` with 0.4-1.3 s of
+    The three static calls were all stored `speech` with 0.4-1.3 s of
     "speech" in them, because `speech_seconds` counts loud seconds on the **processed**
     copy and the gain stage had just lifted broadband noise 24-30 dB clear of the floor.
     The measure that sees it has to run on the recorder's own file, and has to be paired
@@ -1282,7 +1282,7 @@ class TestStaticContent:
 
         `speechish` — broadband noise cut into syllables — measures 1.00 on the flatness
         axis, exactly like static.  What keeps it out is that it is loud: production
-        2405803/2405804 are the same transmission recorded twice, 0.74 flat and -19 dBFS,
+        the quiet duplicate pair are the same transmission recorded twice, 0.74 flat and -19 dBFS,
         and they are excluded on level alone.
         """
         source = self.encode(speechish(2.0), tmp_path / "loudnoise.mp3")
@@ -1307,7 +1307,7 @@ class TestStaticContent:
 class TestSpeechContent:
     """Did anybody actually say anything? (``audio_meta.content``)
 
-    Production calls 2395971 and 2395972 are one 0.648 s transmission on TRANSIT: 0.35 s at
+    The key-up pair are one 0.648 s transmission on TRANSIT: 0.35 s at
     -80 dBFS and then a single click at -22 dBFS, peaking at -9.  A mic keyed and released.
     The whole-clip mean is about -50 dBFS, which sails past the -60 ``silent`` floor, so the
     call was stored as speech, transcribed (to nothing) and queued for export — twice, once
@@ -1361,7 +1361,7 @@ class TestSpeechContent:
         assert result.meta["content"] == "none"
 
     def test_a_call_that_is_nothing_but_a_tone_holds_no_speech(self, tmp_path: Path) -> None:
-        """Production 2396243: 2.0 s of 993 Hz and nothing else.
+        """The tone-only call: 2.0 s of 993 Hz and nothing else.
 
         A tone clears the -40 dB floor by a mile, so counting loud seconds alone would call
         two of them speech — and then the call is transcribed (to a hallucination), exported,
@@ -1379,7 +1379,7 @@ class TestSpeechContent:
         assert len(result.meta["tone_spans"]) == 1
 
     def test_a_page_is_content_even_with_nothing_said_after_it(self, tmp_path: Path) -> None:
-        """Production 2396355/2396357: 4.25 s of fire dispatch page and not one word.
+        """The tone-out pair: 4.25 s of fire dispatch page and not one word.
 
         An A tone of about a second then a B tone of about 2.75, and that is the whole call —
         so by seconds-of-speech alone it is indistinguishable from a mic click, and the
@@ -1599,7 +1599,7 @@ class TestNoSpeechRetention:
         return np.concatenate([silence(0.35), 0.08 * np.ones(int(0.03 * SR)), silence(0.05)])
 
     def test_a_page_with_no_speech_keeps_its_audio(self, session, tmp_path) -> None:  # noqa: ANN001
-        """Calls 2396355/2396357: a 4.25 s tone-out and nothing else.  It is not a click."""
+        """The tone-out pair: a 4.25 s tone-out and nothing else.  It is not a click."""
         from app.audioproc.jobs import process_call
         from app.config import Settings
         from tests.conftest import TEST_DATABASE_URL

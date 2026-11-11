@@ -152,7 +152,7 @@ def test_a_legacy_backlog_push_lands_in_2024_not_today(  # noqa: ANN001
 ) -> None:
     """The whole point.  No ``dateTime``, a pre-2025 name, and the file goes to 2024.
 
-    This is the shape that put 972,347 files in one directory: the old ``upload_path`` took
+    This is the shape that put nearly a million files in one directory: the old ``upload_path`` took
     its date from the form *before* the recording was parsed, so a 2024 call filed itself
     under the afternoon it was pushed.
     """

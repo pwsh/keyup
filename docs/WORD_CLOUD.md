@@ -65,7 +65,7 @@ ORDER BY n DESC LIMIT :limit * 3;
 ## Cost on 5.2 M calls
 
 Measured on the dev archive (7,220 transcribed calls): the tokenise, stop-list and count query takes 80–150 ms
-warm, about 15–20 µs of CPU per transcript. Production has about 2.6 M transcripts done. The busiest talkgroup
+warm, about 15–20 µs of CPU per transcript. A large archive can hold a few million transcripts. The busiest talkgroup
 (*EC LAW 1*) logs about 2,600 calls a day.
 
 | Scope | Calls scanned | Estimate |

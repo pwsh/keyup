@@ -311,6 +311,11 @@ class CallRecord:
     sources: tuple[CallSourceRef, ...] = ()
     #: the recorder's own metadata verbatim — the whole sidecar, or the ID3 frame map
     raw_meta: dict[str, Any] = field(default_factory=dict)
+    #: **push path only** — ``decoder`` came from the push's own ``decoder`` form field
+    #: (trunkd's ``NBFM`` on a conventional-channel call) because neither the filename nor
+    #: ID3 named one.  Such a protocol may *name a new system* but never completes an
+    #: existing one: see ``fill_protocol`` on :func:`app.ingest.service.upsert_system`.
+    decoder_from_form: bool = False
     #: **push path only** — where ``started_at`` actually came from, which ``time_source``
     #: cannot say: the endpoint stamps every push ``upload`` whether the recorder sent a
     #: ``dateTime`` or the server had to invent one.  ``app.api.call_upload`` sets it to

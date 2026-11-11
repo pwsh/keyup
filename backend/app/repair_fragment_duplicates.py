@@ -7,7 +7,7 @@ ones to it.
 
 What happened
 -------------
-Before the duplicate rules were tightened (9dc2b9f) three of
+Before the duplicate rules were tightened, three of
 :func:`app.ingest.reconcile.matches`'s answers were too generous:
 
 ``fragment inside``

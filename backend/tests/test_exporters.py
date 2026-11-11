@@ -927,7 +927,7 @@ def test_the_export_filter_on_a_processed_source_is_the_stage_alone() -> None:
     assert export_filter(None, _lufs(-11.0)) == f"{LOUDNORM_11},{LIMITER}"
 
 
-#: what the §5.5 pass stored for production call 2396243 — a 2 s console tone and no speech
+#: what the §5.5 pass stored for the tone-only call — a 2 s console tone and no speech
 TONE_ONLY_META = {
     "head_trim_s": 0.12,
     "tone_removed": False,
@@ -939,7 +939,7 @@ TONE_ONLY_META = {
 
 
 def test_the_tone_envelope_goes_back_on_after_the_export_lift() -> None:
-    """Call 2396243 left for OpenMHz louder in its tone than the file we stored.
+    """The tone-only call left for OpenMHz louder in its tone than the file we stored.
 
     It is 3.38 s of 993 Hz at -18 dBFS and nothing else.  The §5.5 pass took the span down to
     about -33 dB in the processed copy — and then the export's loudness stage measured that
@@ -2088,7 +2088,7 @@ def test_encrypted_calls_can_be_opted_into(session, export_settings, tmp_path) -
 def test_a_call_nobody_spoke_on_is_not_published(session, export_settings, tmp_path) -> None:  # noqa: ANN001
     """A mic key-up is a real transmission and a worthless upload.
 
-    Production 2395971/2395972: 0.648 s, one click, no words — and both copies were queued
+    The key-up pair: 0.648 s, one click, no words — and both copies were queued
     for both services because nothing in the ledger's three refusals is about *content*.
     The audio pass measures it (``audio_meta.content``) and this is where that lands.
     """
@@ -2113,7 +2113,7 @@ def test_a_call_nobody_spoke_on_is_not_published(session, export_settings, tmp_p
     call.audio_meta = {"content": "speech", "speech_s": 1.4, "speech_floor_db": -40.0}
     assert ledger.skip_reason_for(call, export_settings) is None
 
-    # Nor is a **page**: calls 2396355/2396357 are 4.25 s of fire dispatch tone-out and not
+    # Nor is a **page**: the tone-out pair are 4.25 s of fire dispatch tone-out and not
     # one word, and they are the most important audio on the system.  Only `none` refuses.
     call.audio_meta = {"content": "page", "speech_s": 0.0, "speech_floor_db": -40.0}
     assert ledger.skip_reason_for(call, export_settings) is None
@@ -2824,6 +2824,96 @@ def test_a_conventional_system_never_gets_a_calls_ledger_row(session, export_set
     assert ledger.discover(session, service="broadcastify", watermark=mark, settings=export_settings) == 1
     rows = session.scalars(select(CallExport).where(CallExport.service == "broadcastify")).all()
     assert [row.call_id for row in rows] == [call.id]
+
+
+def test_a_new_nbfm_system_is_not_trunked() -> None:
+    """What a trunkd conventional push names a new system (``decoder=NBFM``)."""
+    from app.models import infer_trunked
+
+    assert infer_trunked("NBFM") is False
+    assert System(name="x", protocol="NBFM").is_trunked is False
+
+
+@pytest.mark.parametrize(
+    ("raw_meta", "analog"),
+    [
+        ({"mode": "nbfm", "decoder": "NBFM"}, True),  # what trunkd sends
+        ({"mode": "NBFM"}, True),
+        ({"decoder": " nbfm "}, True),
+        ({"mode": "digital", "decoder": "P25 Phase 1"}, False),
+        ({"audio_type": "analog"}, False),  # a trunked system's analog talkgroup is fine
+        ({"id3": {"Decoder": "NBFM"}}, False),  # only the recorder's own top-level keys
+        ({"mode": 1}, False),
+        ({}, False),
+        (None, False),
+    ],
+)
+def test_is_analog_call_reads_only_the_recorders_mode_and_decoder(raw_meta, analog) -> None:  # noqa: ANN001
+    assert gate.is_analog_call(Call(raw_meta=raw_meta)) is analog
+
+
+def test_the_sql_analog_mark_agrees_with_the_python_one(session, tmp_path) -> None:  # noqa: ANN001
+    metas = [
+        {"mode": "nbfm", "decoder": "NBFM"},
+        {"decoder": " nbfm "},
+        {"mode": "digital"},
+        {"audio_type": "analog"},
+        {"id3": {"Decoder": "NBFM"}},
+        None,
+    ]
+    calls = []
+    for n, meta in enumerate(metas):
+        call = seed_call(
+            session, root=tmp_path, tgid=1701, priority="live", file_path=f"20260901/analog/{n}.mp3"
+        )
+        call.raw_meta = meta
+        calls.append(call)
+    session.commit()
+    in_sql = set(session.scalars(select(Call.id).where(gate.analog_call_clause())).all())
+    in_python = {c.id for c in calls if gate.is_analog_call(c)}
+    assert in_sql == in_python == {calls[0].id, calls[1].id}
+
+
+def test_broadcastify_refuses_an_nbfm_call_filed_under_a_trunked_system(
+    session, export_settings, tmp_path  # noqa: ANN001
+) -> None:
+    """Defence in depth: a conventional channel filed under a P25 system's label.
+
+    The system passes the trunked rule; the call itself says it is analog NBFM, and Calls
+    refuses it in both halves — never discovered, and ``not_trunked`` if it was claimed.
+    The Feed and OpenMHz, which take conventional traffic, still take it.
+    """
+    call = seed_call(session, root=tmp_path, tgid=1701, priority="live")
+    assert session.get(System, call.system_id).is_trunked is True
+    call.raw_meta = {"recorder": "trunkd", "mode": "nbfm", "decoder": "NBFM", "tone": "192.8"}
+    session.commit()
+    mark = datetime.now(UTC) - timedelta(minutes=5)
+
+    assert gate.trunked_ok(session, call, "broadcastify") is False
+    assert gate.trunked_ok(None, call, "broadcastify") is False  # no session needed to say no
+    assert gate.excluded_reason(session, call, export_settings, "broadcastify") == "not_trunked"
+    assert gate.excluded_reason(session, call, export_settings, "openmhz") is None
+    assert gate.excluded_reason(session, call, export_settings, "broadcastify_feed") is None
+    assert ledger.discover(session, service="broadcastify", watermark=mark, settings=export_settings) == 0
+    assert ledger.discover(session, service="openmhz", watermark=mark, settings=export_settings) == 1
+
+    # Even an operator's explicit ``trunked = True`` does not let an analog call through.
+    session.get(System, call.system_id).trunked = True
+    session.commit()
+    assert gate.trunked_ok(session, call, "broadcastify") is False
+    assert ledger.discover(session, service="broadcastify", watermark=mark, settings=export_settings) == 0
+
+
+def test_a_p25_call_without_the_analog_mark_is_unaffected(session, export_settings, tmp_path) -> None:  # noqa: ANN001
+    """Existing data: no ``mode``/``decoder`` in ``raw_meta`` → exactly the old answer."""
+    call = seed_call(session, root=tmp_path, tgid=1701, priority="live")
+    call.raw_meta = {"recorder": "trunkd", "nac": "0x4A3", "audio_type": "digital"}
+    session.commit()
+    mark = datetime.now(UTC) - timedelta(minutes=5)
+
+    assert gate.trunked_ok(session, call, "broadcastify") is True
+    assert gate.excluded_reason(session, call, export_settings, "broadcastify") is None
+    assert ledger.discover(session, service="broadcastify", watermark=mark, settings=export_settings) == 1
 
 
 def test_calls_and_the_feed_read_different_checkboxes(session, export_settings, tmp_path) -> None:  # noqa: ANN001

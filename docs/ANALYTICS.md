@@ -1,6 +1,6 @@
 # Analytics on the public site
 
-Google Tag Manager with this site's Google Analytics 4 stream, loaded by `frontend/src/lib/publicSite.ts`.
+Google Tag Manager with the operator's own Google Analytics 4 stream, loaded by `frontend/src/lib/publicSite.ts`.
 It runs only for a guest on the site's public hostname (`VITE_PUBLIC_HOST` in `.env`, `archive.example.org`
 in these docs). Signed-in readers, every other hostname and the
 `/embed/` pages never load it, and with `VITE_PUBLIC_HOST` blank (the default) no hostname is public, so
@@ -18,7 +18,7 @@ docker compose up -d --build web
 | Variable | Value |
 | --- | --- |
 | `VITE_PUBLIC_HOST` | The site's public hostname, without scheme or port (`archive.example.org`). Required: blank means no hostname is public and analytics never loads. |
-| `VITE_GTM_CONTAINER_ID` | The id of this site's own Tag Manager container, as shown at the top of its workspace. Blank or malformed: analytics off. |
+| `VITE_GTM_CONTAINER_ID` | The id of your own Tag Manager container, as shown at the top of its workspace. Blank or malformed: analytics off. |
 | `VITE_PRIVACY_CONTACT` | Email address or URL for removal requests, shown on `/privacy`. |
 
 ## Required setup
@@ -33,7 +33,7 @@ Leave the Tag Manager container as Google created it: **no custom tags**. Adding
 this stream inside the container stopped all sending (2026-11-08), because it loaded this container
 back instead of GA4's own code.
 
-Two GA4 settings on this site's stream are still required, and the code cannot change them:
+Two GA4 settings on your own GA4 stream are still required, and the code cannot change them:
 
 1. Enhanced measurement: off entirely. Its history-change page view reads the real address and
    ignores the clean page.
@@ -50,6 +50,6 @@ Check by loading the site signed out on a URL with `?q=` and a call id: every re
 | `call_play` | The clean page only, nothing about the call. |
 | `live_start` | The clean page only, nothing about the feed. |
 
-A referrer from this site is dropped; one from another site is kept.
+A referrer from the archive's own hostname is dropped; one from another site is kept.
 
 Keep `/privacy` (`frontend/src/pages/Privacy.tsx`) true to what is sent.

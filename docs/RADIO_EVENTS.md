@@ -9,7 +9,7 @@ a radio that turned on, registered with the site and selected a talkgroup — an
 to the archive.
 
 The measurement behind this is `docs/NON-VOICE-DATA.md` in the **trunkd** repository, §3–§5 (it is not
-part of this repository: [https://github.com/pwsh/trunkd/blob/main/docs/NON-VOICE-DATA.md](https://github.com/pwsh/trunkd/blob/main/docs/NON-VOICE-DATA.md)). Over 150 s of one P25
+part of this repository: [trunkd's NON-VOICE-DATA.md on GitHub](https://github.com/pwsh/trunkd/blob/main/docs/NON-VOICE-DATA.md)). Over 150 s of one P25
 system's control channel it counted 3 956 TSBKs at 26.4/s, of which the registration/affiliation family is roughly
 **600 an hour** — three orders of magnitude below the firehose, and the reason this is a table while the rest is a
 histogram (§5 below).

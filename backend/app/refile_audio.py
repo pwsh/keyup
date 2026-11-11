@@ -1,10 +1,10 @@
 """Move already-stored recordings into the partition their own date names.
 
 The sibling of :mod:`app.repair_timestamps`, and the second half of the same repair.  That
-one put 1,041,258 backlog calls back on the day they were *recorded*; this one puts their
+one puts the backlog calls back on the day they were *recorded*; this one puts their
 files there.  Until it runs, the archive's directory layout still records the day the
-backlog was *pushed*: 972,347 files in ``uploads/2026/09/01`` and 82,174 in
-``uploads/2026/08/31``, because :func:`app.api.call_upload.upload_path` used to partition
+backlog was *pushed* — after a large migration, hundreds of thousands of files in one
+``uploads/YYYY/MM/DD`` — because :func:`app.api.call_upload.upload_path` used to partition
 on a date taken from the form before anything had parsed the recording
 (docs/ARCHITECTURE.md, "Storage layout").
 

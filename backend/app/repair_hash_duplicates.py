@@ -15,10 +15,10 @@ on it, 0.14-2 s — encodes to byte-identical MP3 bytes every time.  One hash th
 spreads across hundreds of unrelated calls, months and talkgroups apart, and the first row
 carrying it became the "original" of every one that followed.
 
-Production carries **927** such rows (924 group calls, 3 unit calls) whose primary started
-more than 300 s away; one hash alone covers 155 of them.  Call 2250773 — a 1.7 s unit call
-on 2026-09-08 10:13 — was ruled a duplicate of call 8371, a 1.7 s *group* call on talkgroup
-2 from 2026-08-31, rule ``identical sha256``.  Each one is invisible: every API listing
+A large archive can carry **hundreds** of such rows (mostly group calls, a few unit calls)
+whose primary started more than 300 s away; one hash alone can cover over a hundred of them.
+A 1.7 s unit call, for example, was ruled a duplicate of a 1.7 s *group* call on another
+talkgroup a week earlier, rule ``identical sha256``.  Each one is invisible: every API listing
 filters on ``duplicate_of IS NULL``.
 
 The repair

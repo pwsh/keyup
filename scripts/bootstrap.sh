@@ -257,7 +257,7 @@ prepare_dir "$(env_get AUDIO_ROOT ./audio)" uploads
 prepare_dir "$(env_get EXPORT_DIR ./exports)"
 prepare_dir "$(env_get WAVEFORM_CACHE_DIR ./cache/waveform)"
 prepare_dir "$(env_get EVENT_LOG_ROOT ./eventlogs)"
-prepare_dir "$(env_get BACKUP_DIR ./backups/db)"
+prepare_dir "$(env_get BACKUP_DIR /srv/keyup/backups/db)"
 
 # --------------------------------------------------------------------------------------
 # 4. up

@@ -56,7 +56,7 @@ describe("AudioTab", () => {
     await signInAsAdmin();
     renderWithProviders(<AudioTab canWrite />, "/admin?tab=audio");
 
-    await userEvent.type(await screen.findByLabelText(/call id/i), "1103864");
+    await userEvent.type(await screen.findByLabelText(/call id/i), "123456");
     await userEvent.click(screen.getByRole("button", { name: /render/i }));
 
     expect(await screen.findByText("-32.4 dBFS")).toBeInTheDocument(); // before

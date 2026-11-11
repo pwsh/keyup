@@ -78,6 +78,25 @@ and a row that was discovered before somebody corrected a system's protocol is r
 upload time with the distinct ledger reason **`not_trunked`**, which is the one skip reason
 worth grepping for when the answer to "why is nothing uploading" is not the switch.
 
+**Analog calls never go to Broadcastify Calls, whatever system they are filed under.**  A call
+whose recorder said it is analog narrowband FM — `raw_meta.mode` or `raw_meta.decoder` equal
+to `nbfm` (any case), which trunkd sends on every call from a conventional `[[channel]]` and
+on nothing else — is refused by the same two layers with the same reason `not_trunked`, even
+when its system is trunked or an operator set `systems.trunked = true`.  That covers a
+conventional channel deliberately filed under a P25 system's label.  Nothing else marks a
+call analog here: trunk-recorder's `audio_type=analog` is also what an analog talkgroup on a
+trunked system says, so it is not read.  A system that keyup *first* sees from such a push is
+created with `protocol = 'NBFM'` (from the push's `decoder` field), so its `trunked` guess is
+false as well; an existing system's protocol is never changed by it.  The Feed and OpenMHz
+take analog calls as before.
+
+This is keyup's own uploader.  With `broadcastify_upload_at = recorder` the recorder
+decides at call end from the desired-state block below, which carries no rule about analog
+calls: in `allow`/`deny` mode its talkgroup list holds only trunked systems' talkgroups (so
+a channel on a non-trunked system is never listed), but in `all` mode, or for a channel
+filed under a trunked system with its Calls box ticked, the recorder itself must refuse
+conventional-channel calls.
+
 ## Which talkgroups — the selection rule
 
 The two safety rules above decide what an exporter *may* publish.  On top of them sits what
@@ -169,7 +188,7 @@ here, with the reason `no speech (0.04 s above -40 dB)` — the constant is
 `ledger.NO_SPEECH_REASON` and the measurement in the parentheses is `audio_meta.speech_s`
 against `audio_speech_floor_db`.  The audio pass decides it (ARCHITECTURE §5.5,
 `audio_meta.content`): a mic keyed and released is a real transmission the archive keeps and
-a worthless upload — production calls 2395971/2395972 are 0.648 s of dead air and one click,
+a worthless upload — one measured key-up, recorded twice, is 0.648 s of dead air and one click,
 and both copies were queued to both services.  Like `encrypted` it writes a `skipped` row, so
 the ledger says we saw it.  Only `content = "none"` and `"static"` refuse (`app.audio.NO_CONTENT`, with
 `ledger.STATIC_REASON` naming the second): a **page** is `"page"` however
@@ -450,7 +469,7 @@ row per call:
 The same block carries `duplicates` (all time) and `duplicates_24h`. Those two count
 `skip_reason` rather than `response`, deliberately: the response columns were added after
 several thousand rows had been written, and the duplicate tally is the biggest number on
-the page — on this deployment 3 485 duplicates against 63 uploads — so counting only rows
+the page — on a busy system, thousands of duplicates against a few dozen uploads — so counting only rows
 that postdate the column would report almost none of them.
 
 Where it shows: the **Calls** card's stat grid ("Duplicates (24 h)") and, under it, a
@@ -468,7 +487,7 @@ Broadcastify refuses a call that arrives too long after it was transmitted, with
 ```
 
 The line is not in their published response table, so what the number means was measured
-here rather than read: over six hours of production rejections (935 of them), the reported
+here rather than read: over six hours of rejections on a live system (several hundred of them), the reported
 skew averaged 20.3 s and matched **(the moment the registration arrives) − (`ts` +
 `callDuration`)** to within a second or two, while the same figure counted from `ts` alone
 was consistently 3.5 s larger. So they measure from the **end** of the transmission, not
@@ -948,8 +967,8 @@ were wrong until they were not, in exactly the way the stored chain's limiter wa
   and because these files have no player-side make-up gain behind them.
 
 **The tone envelope goes back on after the lift.** A loudness stage measures the *whole*
-clip, and a call that is nothing but a tone therefore measures as a quiet call: production
-call 2396243 (talkgroup 1001, 3.38 s) is a 2.0 s 993 Hz console attention tone at
+clip, and a call that is nothing but a tone therefore measures as a quiet call: one measured
+call (3.38 s) is a 2.0 s 993 Hz console attention tone at
 -18 dBFS and no speech at all, the §5.5 pass took its span down to about -33 dB in the
 stored file — and the export stage found a quiet clip, lifted it to -11 LUFS, and handed
 OpenMHz and the Feed a tone *louder* than the one we had just turned down. So

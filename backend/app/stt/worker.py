@@ -141,8 +141,8 @@ AUTO_REQUEUE_PREFIX = "(auto-requeued after outage) "
 #: backend is healthy again; three separate outages landing on the same job before it gets
 #: through is not a thing that happens.  What *does* happen is a recording misread as an
 #: outage — every backend failing on it while serving everybody else — and without a cap
-#: that is a loop: three attempts, parked, requeued with ``attempts = 0``, for ever (call
-#: 5237413, 2026-09-23, two hours until it was parked by hand).  The router now tells the
+#: that is a loop: three attempts, parked, requeued with ``attempts = 0``, for ever (the
+#: looping BOLO call, two hours until it was parked by hand).  The router now tells the
 #: two apart (``RequestFailedEverywhereError``); this is the backstop for when it cannot.
 OUTAGE_REQUEUE_CAP = 3
 
@@ -785,7 +785,7 @@ class SttWorker:
         operator who wants to A/B it.
 
         The prompt is left out of a retry after every backend failed on the recording
-        (:attr:`~app.stt.runner.Job.without_prompt`).  Call 5237413 (2026-09-23), a 43 s
+        (:attr:`~app.stt.runner.Job.without_prompt`).  The looping BOLO call, a 43 s
         BOLO: with the prompt, large-v3 transcribed the first 17 s and then repeated that
         text in 0.5 s segments for 268 s of server time; without it, the same request came
         back in 52 s with the whole broadcast.  Speaches offers no other lever (no
@@ -1383,7 +1383,7 @@ def unpark_backend_outage(session: Session, *, limit: int = UNPARK_BATCH) -> int
 
     Each job gets at most :data:`OUTAGE_REQUEUE_CAP` of these requeues, counted in
     ``outage_requeues``, because this pass resets ``attempts``: a recording misread as an
-    outage would otherwise go round for ever (call 5237413, 2026-09-23).
+    outage would otherwise go round for ever (the looping BOLO call).
     """
     if not a_backend_is_healthy(session):
         return 0

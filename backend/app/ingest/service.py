@@ -143,7 +143,14 @@ class IngestRunSummary:
 # --------------------------------------------------------------------------------------
 
 
-def upsert_system(session: Session, name: str, *, protocol: str | None, wacn: int | None) -> int:
+def upsert_system(
+    session: Session,
+    name: str,
+    *,
+    protocol: str | None,
+    wacn: int | None,
+    fill_protocol: bool = True,
+) -> int:
     """The id of the system called ``name``, creating or completing the row if need be.
 
     **Read first.**  The obvious shape — ``INSERT … ON CONFLICT DO UPDATE … RETURNING id``
@@ -163,6 +170,11 @@ def upsert_system(session: Session, name: str, *, protocol: str | None, wacn: in
     No cache in front of the read: it is a unique-index lookup on a table with six rows in
     it, which is cheaper than the bookkeeping a cache would need to stay correct across the
     processes that write to ``systems`` (the roster importer, the RR sync, the admin API).
+
+    ``fill_protocol=False`` makes ``protocol`` a value for a **new** row only: an existing
+    row's protocol is left exactly as it is, NULL included.  The push path passes it when
+    the protocol is only the recorder's ``decoder`` form field (trunkd's ``NBFM``), which
+    describes one channel and must not re-label a system that already exists.
     """
     row = session.execute(
         select(System.id, System.protocol, System.wacn).where(System.name == name)
@@ -170,7 +182,7 @@ def upsert_system(session: Session, name: str, *, protocol: str | None, wacn: in
     # Nothing to fill in: the row already has everything this call could have supplied.
     if (
         row is not None
-        and (protocol is None or row.protocol is not None)
+        and (protocol is None or row.protocol is not None or not fill_protocol)
         and (wacn is None or row.wacn is not None)
     ):
         return int(row.id)
@@ -180,7 +192,11 @@ def upsert_system(session: Session, name: str, *, protocol: str | None, wacn: in
         .on_conflict_do_update(
             index_elements=[System.name],
             set_={
-                "protocol": func.coalesce(System.protocol, text("excluded.protocol")),
+                "protocol": (
+                    func.coalesce(System.protocol, text("excluded.protocol"))
+                    if fill_protocol
+                    else System.protocol
+                ),
                 "wacn": func.coalesce(System.wacn, text("excluded.wacn")),
             },
         )
@@ -249,7 +265,12 @@ class UnknownSystem(Exception):
 
 
 def resolve_system_id(
-    session: Session, name: str | None, *, protocol: str | None = None, wacn: int | None = None
+    session: Session,
+    name: str | None,
+    *,
+    protocol: str | None = None,
+    wacn: int | None = None,
+    fill_protocol: bool = True,
 ) -> int:
     """The system a write belongs to — never one invented from a fallback label.
 
@@ -267,7 +288,9 @@ def resolve_system_id(
     answers are "the one" and "I cannot".
     """
     if name and name.strip():
-        return upsert_system(session, name.strip(), protocol=protocol, wacn=wacn)
+        return upsert_system(
+            session, name.strip(), protocol=protocol, wacn=wacn, fill_protocol=fill_protocol
+        )
     ids = session.execute(select(System.id).order_by(System.id)).scalars().all()
     if len(ids) == 1:
         return ids[0]
@@ -457,7 +480,7 @@ def pick_radio_row(
     exactly the same answer and must not write: reconciliation resolves a record's two
     radios **before** the call is stored, and until it shared this function it asked a much
     looser question — "any row in this system with this ``radio_id``" — which one unit can
-    answer five different ways.  Production radio 5238001 has five rows (bare, and four
+    answer five different ways.  One radio in a real archive had five rows (bare, and four
     home-system spellings); the loose lookup returned whichever the planner listed last, so
     a unit call's ``(source, target)`` pair rarely named the rows the stored calls actually
     carry, no candidate came back, and every private call reached the screen twice until
@@ -1460,7 +1483,7 @@ def _ingest_new(
 #: ``uploads`` is the one that matters.  Pushed calls are written *and their rows created*
 #: by ``POST /api/call-upload``, which is also what writes their ledger entry, so the only
 #: thing the walk could ever learn about that subtree is that every file in it is already
-#: settled — for which it was enumerating 972,347 files in one directory, and will be
+#: settled — for which it was enumerating nearly a million files in one directory, and will be
 #: enumerating five million across the archive, on every ``INGEST_SCAN_MINUTES`` tick.  It
 #: is the cost of the answer that changed, not the answer (docs/ARCHITECTURE.md, "Don't
 #: enumerate the tree").

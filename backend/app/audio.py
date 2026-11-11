@@ -165,7 +165,7 @@ def upload_partition(
     **The date is the call's own**, taken from ``started_at`` in ``TZ`` (the same zone the
     parser uses for ``started_local``), never the day the push arrived.  A backlog migration
     is a stream of 2022-2024 recordings arriving on one afternoon; filing them by arrival
-    put 972,347 files in a single directory, which ext4's ``dir_index`` survives but
+    put nearly a million files in a single directory, which ext4's ``dir_index`` survives but
     ``rsync``, ``find``, a backup and every directory walk do not (docs/ARCHITECTURE.md,
     "Storage layout").  By call date the same archive spreads over ~1,100 real days.
 

@@ -1,8 +1,8 @@
 """Stored talkgroup alert rules: every id is an on-air tgid, not a ``talkgroups.id``.
 
 A ``talkgroup`` alert rule matched each of its ids against the call's tgids **and** its
-``talkgroups.id`` primary key.  The two number spaces overlap (43 collisions on production
-when c2d54c0 fixed the same bug in ``?talkgroup=``), so a rule for one channel also fired
+``talkgroups.id`` primary key.  The two number spaces overlap (dozens of collisions on a real
+archive when the same bug was fixed in ``?talkgroup=``), so a rule for one channel also fired
 on an unrelated one.  The matcher now reads the ids as tgids only;
 ``a7f3c2d91b64`` translated ``feeds`` and ``saved_searches`` but not
 ``alert_rules``, and this migration does.

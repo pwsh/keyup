@@ -734,7 +734,7 @@ SETTINGS_SPEC: list[tuple[str, str, str, str, str]] = [
         "float",
         "Audio",
         "Tone attenuation (dB)",
-        "How far `attenuate` pulls a **single held tone** down — the console attention tone that leads a dispatch (call 2396065 is 1.95 s of 993 Hz at -10.5 dBFS in front of 17 s of speech). It carries no information and is simply loud, so it can go a long way down: 30 dB leaves a marker where it was.",
+        "How far `attenuate` pulls a **single held tone** down — the console attention tone that leads a dispatch (the attention-tone call is 1.95 s of 993 Hz at -10.5 dBFS in front of 17 s of speech). It carries no information and is simply loud, so it can go a long way down: 30 dB leaves a marker where it was.",
     ),
     (
         "audio_page_tone_attenuate_db",

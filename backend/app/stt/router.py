@@ -60,7 +60,7 @@ class RequestFailedEverywhereError(BackendError):
     one of them transcribed somebody else's call within :data:`SUCCESS_EVIDENCE_S` — and it
     is this recording they time out or error on.  The worker counts an attempt for it and
     parks the job for good after ``max_attempts``, where an outage would be parked as
-    recoverable and requeued automatically.  Treating it as an outage is how call 5237413
+    recoverable and requeued automatically.  Treating it as an outage is how the looping BOLO call
     (2026-09-23) went round for two hours, holding a slot on every server each round.
     """
 

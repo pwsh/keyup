@@ -259,7 +259,7 @@ def tone_envelope_for(
     """The tone attenuation to re-apply after the export loudness stage, or ``[]``.
 
     A call that is *nothing but* a tone defeats every loudness measurement there is.
-    Production call 2396243 (talkgroup 1001, 3.38 s) is a 2.0 s 993 Hz console tone at
+    The tone-only call (talkgroup 1001, 3.38 s) is a 2.0 s 993 Hz console tone at
     -18 dBFS and no speech at all: the §5.5 pass took the span down to about -33 dB in the
     stored file, and then :func:`loudness_stage` measured the processed copy, found nothing
     in it but the attenuated tone, and lifted the whole thing to the -11 LUFS export target —

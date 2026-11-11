@@ -1,17 +1,18 @@
 # Migrating the sdrtrunk archive into Keyup
 
-Years of sdrtrunk recordings sit on an SMB share from before Keyup existed — about **20 GB**,
-filed as **one folder per channel, one ZIP per day inside it**:
+An sdrtrunk installation that predates Keyup usually has years of recordings somewhere — often
+archived to a file share, commonly as **one folder per channel, one ZIP per day inside it**:
 
 ```
-//nas/scanner/FIRE OPS 4/20260828.zip
-                        /20260829.zip
-             /EVENT 6/20260828.zip
-             /STATE LAW 2/20260828.zip
+//fileserver/recordings/FIRE OPS 4/20260828.zip
+                                  /20260829.zip
+                       /EVENT 6/20260828.zip
+                       /STATE LAW 2/20260828.zip
 ```
 
-This is how they get into the archive **while trunkd keeps feeding live calls**, without the
-migration ever delaying a live transcription.
+This guide gets them into the archive **while your live recorders keep feeding calls**,
+without the migration ever delaying a live transcription. The same steps work for loose
+`.mp3` files and for a local directory instead of a share.
 
 The mechanism is [priority and flow control](RECORDERS.md#priority-and-flow-control): every
 migrated call is pushed with `priority=backlog`, which puts its transcription job 500 above
@@ -19,19 +20,16 @@ the talkgroup's own priority — behind every live call, forever if need be — 
 refuse the migration with `429` whenever the queue is deep, while live pushes sail past.
 
 **The calls themselves are never delayed.** A backlog upload that is accepted is written,
-indexed, searchable, playable and visible to the correlation API immediately. Only the
+indexed, searchable, playable and visible to the API and to webhook consumers immediately. Only the
 transcript waits.
 
 ---
 
-
-> **Superseded — kept as history. Measured 2026-08-31 (docs/RECONCILIATION.md §1):** the
-> sdrtrunk filename stamp is the file-close instant — the call **end** plus ≈1.7 s — not the
-> start. The advice that followed was to run the client with `--datetime-is-end`. **It no
-> longer applies:** the server-side parser now reads the stamp as the call end itself
-> (`started_at = stamp − duration`, `app/ingest/parser.py`) and also parses the pre-2025
-> legacy names, so the client should send **neither** flag — sending one would only have the
-> client redo, less well, what the server already does.
+> **Timestamps:** the sdrtrunk filename stamp is the file-close instant — the call **end**
+> plus about 1.7 s — not the start (docs/RECONCILIATION.md §1). The server-side parser reads
+> it that way (`started_at = stamp − duration`, `app/ingest/parser.py`) and also parses the
+> pre-2025 legacy names, so the client sends **no** `dateTime` flag; see
+> [`dateTime`](#datetime---send-datetime-and---datetime-is-end) below.
 
 ## Which path
 
@@ -49,17 +47,17 @@ share needs no write access at all.
 
 ---
 
-## How long 20 GB is
+## How long a large archive takes
 
-Worth internalising before starting, because it is the reason for every flow-control
-decision below:
+Worth working out before starting, because it is the reason for every flow-control
+decision below. A worked example for a 20 GB archive (scale it to yours with `du -sh`):
 
 | | |
 |---|---|
 | 20 GB of sdrtrunk MP3 at ~16 kb/s | ≈ **2 800 hours** of audio |
-| Whisper on the appliance, ~25× real time | ≈ **110 hours** of transcription if it had the box to itself |
+| a transcription backend at ~25× real time | ≈ **110 hours** of transcription if it had the host to itself |
 
-It does not have the box to itself — live calls come first, always. So every migrated call
+It does not have the host to itself — live calls come first, always. So every migrated call
 goes up as `priority=backlog`, the client polls `GET /api/upload/flow` and parks itself
 whenever the queue is deep, and the transcripts land over days or weeks while the **calls
 themselves are searchable within seconds of being accepted**. Nothing about the migration is
@@ -79,11 +77,11 @@ endpoint (404) makes the client stop asking and upload as before.
 
 ## Mounting the share
 
-Read-only, on the recorder laptop (or anywhere else with python3.11+ and a route to Keyup):
+Read-only, on whichever machine will run the tool (anything with Python 3.11+ and a route to Keyup):
 
 ```sh
 sudo mkdir -p /mnt/sdrtrunk-archive
-sudo mount -t cifs //nas/scanner /mnt/sdrtrunk-archive \
+sudo mount -t cifs //fileserver/recordings /mnt/sdrtrunk-archive \
     -o ro,username=archive,uid=$(id -u),gid=$(id -g),vers=3.0,iocharset=utf8
 # password prompt; or -o credentials=/root/.smbcred (chmod 600, "username=…/password=…")
 ```
@@ -95,8 +93,8 @@ which refuse SMB1. Add `nofail` if you put it in `/etc/fstab`.
 Without root, the desktop session can mount it in userspace instead:
 
 ```sh
-gio mount smb://nas/scanner
-ls /run/user/$(id -u)/gvfs/'smb-share:server=nas,share=scanner'
+gio mount smb://fileserver/recordings
+ls /run/user/$(id -u)/gvfs/'smb-share:server=fileserver,share=recordings'
 ```
 
 gvfs is slower and less patient with tens of thousands of small reads; prefer `cifs` for a
@@ -105,7 +103,7 @@ run of this size and keep gvfs for a look around.
 Then point the tool at the mount, and say where it came from:
 
 ```sh
-./migrate_sdrtrunk.py --url http://192.0.2.10:8095 --source-note '//nas/scanner ro 2026-08-31' \
+./migrate_sdrtrunk.py --url http://192.0.2.10:8095 --source-note '//fileserver/recordings ro, first pass' \
     --ledger ~/keyup-migration.jsonl /mnt/sdrtrunk-archive
 ```
 
@@ -120,7 +118,7 @@ tells a later reader which share, which mount, which pass a row came from.
    silencing a recorder:
 
    ```sh
-   docker compose exec worker keyup token create migration --scopes upload
+   docker compose exec api keyup token create migration --scopes upload
    # {"id": 7, "label": "migration", "scopes": ["upload"], "token": "kup_…"}   ← shown once
    ```
 
@@ -167,7 +165,7 @@ export KEYUP_KEY=kup_…
 
 # then the lot, oldest first, two threads
 ./migrate_sdrtrunk.py --url http://192.0.2.10:8095 --workers 2 \
-    --source-note '//nas/scanner' --ledger ~/keyup-migration.jsonl /mnt/sdrtrunk-archive
+    --source-note '//fileserver/recordings' --ledger ~/keyup-migration.jsonl /mnt/sdrtrunk-archive
 ```
 
 ### Sources
@@ -236,7 +234,7 @@ One JSON object per finished call, appended as it finishes:
  "name": "20260829_015213_Example-System_Site-A_T-Control__TO_1801_FROM_1234567.mp3",
  "folder": "FIRE OPS 4", "size": 15005, "crc32": "3d26e12e",
  "sha256": "7d62d608…", "status": "uploaded", "detail": "Call imported successfully.",
- "note": "//nas/scanner", "at": 1788168254.229}
+ "note": "//fileserver/recordings", "at": 1788168254.229}
 ```
 
 `key` is `archive!member` for a member and the plain path for a loose file — which is exactly
@@ -282,7 +280,7 @@ alone would place every migrated call one duration late.
 
 ### Timestamps: the pre-2025 filenames, and the repair
 
-**This already went wrong once — read this before you resume the run.**
+**Read this if an earlier Keyup version already imported part of the archive.**
 
 Sending no `dateTime` (above) makes the server's reading of `audioName` the *only* source of a
 migrated call's time. Pre-2025 sdrtrunk writes that name **without the underscore between the
@@ -293,15 +291,16 @@ stamp and the system**:
  ^ modern builds put a "_" here
 ```
 
-The client's own regex was fixed for that; Keyup's parser was not, so `parse_filename` raised
-for every pre-2025 name, the push path's time chain fell through to *now minus the duration*,
-and **1,041,258 calls were filed on the day they were uploaded** — with `time_source='upload'`
-claiming a recorder had said so. Reconciliation then compared those invented times and matched
-911,778 of them against each other; conversations were threaded over the same fiction.
+Older Keyup versions could not parse that shape, so `parse_filename` raised for every pre-2025
+name, the push path's time chain fell through to *now minus the duration*, and **every such call
+was filed on the day it was uploaded** — with `time_source='upload'` claiming a recorder had said
+so. Reconciliation then compared those invented times and matched most of them against each
+other, and conversations were threaded over the same fiction. On a large backlog that is
+hundreds of thousands of calls.
 
-Three things fix it, in this order:
+If your archive was imported that way, three things fix it, in this order:
 
-1. **Deploy the parser fix** (`app/ingest/parser.py`: the underscore after the time is
+1. **Upgrade Keyup** so it has the parser fix (`app/ingest/parser.py`: the underscore after the time is
    optional, and in that dialect the system's spaces are underscores, so `Example_System_SiteA_T-Control`
    is the *Example System* system on the SiteA site). Without it the repair below finds nothing
    to do and the client's next push is refused. Where that block's system *ends* is a guess from
@@ -324,8 +323,8 @@ Three things fix it, in this order:
    the transcript made from its bytes. It does move **queued** transcription work, because phase
    B is reconciliation: a row ruled a duplicate goes `transcript_status='skipped'` and its queued
    jobs are cancelled, and a swap enqueues the new primary in the **backlog** band (the
-   talkgroup's own priority + 500) rather than at the live path's priority 1 — a repair promotes
-   hundreds of thousands of 2022–2024 primaries, and at priority 1 every one of them would sit in
+   talkgroup's own priority + 500) rather than at the live path's priority 1 — a repair can promote
+   hundreds of thousands of backlog primaries, and at priority 1 every one of them would sit in
    front of the live feed. Phase A also frees the
    rows *pointing at* a repaired row — a trunkd call or an unparsable-name row that was hidden
    behind one — and phases B and C rule on those too. Phase C works in batches of 1,000 because
@@ -339,8 +338,8 @@ Three things fix it, in this order:
 **Pause the scheduled reconcile pass for the duration of `--apply`.** `RECONCILE_ENABLED` /
 `RECONCILE_MINUTES` drive a worker job that reconciles a recent window in one transaction, and it
 takes the same per-talkgroup `pg_advisory_xact_lock(4242, tgid)` conversation locks the repair
-takes — over different rows, in a different order. The first full-size run died on exactly that
-at 86 % of 1,041,258 rows: two transactions each holding several of those locks, each waiting on
+takes — over different rows, in a different order. A full-size run can die on exactly that most
+of the way through a million rows: two transactions each holding several of those locks, each waiting on
 one the other held. Both phases now take every lock they can predict **up front and in ascending
 talkgroup order**, which is a total order and therefore has no cycle in it, and any batch that
 still loses a race is rolled back, slept on with jitter and re-run up to five times (a `WARNING`
@@ -358,13 +357,13 @@ and then the key is already held — and it is what the retry is for.
 The endpoint now refuses a **backlog** push it cannot derive a time for — 400,
 `{"error": "no_call_time", …}` — rather than filing it under its arrival. The client counts that
 as failed, keeps it out of the ledger's done set, and re-sends it on the next run, so the fix is
-always "deploy the parser (or pass `--send-datetime`) and start the tool again". A *live* push
+always "upgrade Keyup (or pass `--send-datetime`) and start the tool again". A *live* push
 keeps the arrival fallback, with a rate-limited `WARNING` and a `call.time_fallback` activity
 event, because a live call has no second chance.
 
 **Until `--regroup` runs, the conversations are still wrong** — and that is not only cosmetic.
 Phase A moves the calls but not `conversations.started_at` / `ended_at`, so the enormous bogus
-threads stay parked on 2026-09-01 with no members, and a live call on one of those talkgroups
+threads stay parked on the upload day with no members, and a live call on one of those talkgroups
 today is within the grouping gap of one and *joins* it. Run `--regroup` in the same maintenance
 window, not "later": afterwards those threads hold nothing but live calls, so the prune leaves
 them standing and the mess needs untangling by hand. *(Follow-up worth considering, not built:
@@ -375,7 +374,7 @@ live traffic.)*
 ### Re-filing the audio: run `refile-audio` once, after the timestamp repair
 
 `fix-upload-timestamps` moves the rows; the **files** are still in the directory the upload day
-chose — 972,347 of them in `uploads/2026/09/01` and 82,174 in `uploads/2026/08/31`. That is not a
+chose — after a large migration, hundreds of thousands of them in one `uploads/YYYY/MM/DD`. That is not a
 correctness problem (`calls.file_path` is the source of truth and a lookup by name in an ext4
 `dir_index` directory is a hash probe) and it is a serious operational one: `readdir` returns hash
 order, so `rsync`, `find`, a backup and any directory walk pay for the whole directory and then
@@ -383,9 +382,9 @@ seek all over the disk. So, **once, after the timestamps are right**:
 
 ```sh
 docker compose exec api keyup refile-audio                              # dry run: what it would move
-docker compose exec api keyup refile-audio --apply                      # ~1.05M renames, minutes
+docker compose exec api keyup refile-audio --apply                      # a million renames: minutes
 docker compose exec api keyup refile-audio --apply \
-    --source-prefix uploads/2026/09/01                                  # or just the one directory
+    --source-prefix uploads/YYYY/MM/DD                                  # or just the one directory
 ```
 
 It walks `calls`, not the filesystem — enumerating the directory it exists to break up would be
@@ -398,11 +397,11 @@ row whose file made it across before the commit did is recognised and repaired. 
 directories are pruned as it goes.
 
 Order matters: run it **after** `fix-upload-timestamps --apply`, because it partitions on
-`started_at`, and a run against the un-repaired rows would faithfully re-file a million calls
-under 2026-09-01 all over again.
+`started_at`, and a run against the un-repaired rows would faithfully re-file every migrated call
+under the upload day all over again.
 
-New pushes need nothing — the endpoint has filed by call date since this branch (ARCHITECTURE.md
-§1.1, "Storage layout").
+New pushes need nothing — current Keyup files them by call date (ARCHITECTURE.md §1.1,
+"Storage layout").
 
 ---
 
@@ -445,7 +444,7 @@ laptop that would rather not, run it a channel at a time against the same ledger
 ```sh
 for channel in /mnt/sdrtrunk-archive/*/; do
   ./migrate_sdrtrunk.py --url http://192.0.2.10:8095 --ledger ~/keyup-migration.jsonl \
-      --source-note '//nas/scanner' "$channel" || echo "FAILED: $channel" >> ~/migration-failures
+      --source-note '//fileserver/recordings' "$channel" || echo "FAILED: $channel" >> ~/migration-failures
 done
 ```
 
@@ -482,5 +481,5 @@ hundred thousand calls takes as long as it takes; nothing about it is holding a 
 Finally, **revoke the token**:
 
 ```sh
-docker compose exec worker keyup token revoke 7
+docker compose exec api keyup token revoke 7
 ```

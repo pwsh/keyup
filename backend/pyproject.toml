@@ -1,6 +1,6 @@
 [project]
 name = "keyup"
-version = "0.1.0"
+version = "0.1.1"
 description = "Keyup — sdrtrunk call archive: ingest, transcription, REST/WebSocket API"
 requires-python = ">=3.12"
 license = "AGPL-3.0-or-later"

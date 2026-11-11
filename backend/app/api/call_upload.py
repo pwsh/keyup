@@ -69,7 +69,7 @@ the name parses), then — for a name the parser cannot read at all — the ID3 
 on its own.  With none of the three, **a push at ``backlog`` (or ``bulk``) priority is refused** — 400,
 ``{"error": "no_call_time"}`` — because a backlog upload is a file that still exists and
 can simply be sent again once whatever hid its time is fixed, and filing it under its
-arrival instead is how 1,041,258 calls came to be stamped with their upload date
+arrival instead is how a million backlog calls came to be stamped with their upload date
 (docs/MIGRATION.md, "Timestamps").  A *live* push has no second chance and keeps the
 arrival fallback, with a rate-limited WARNING and a ``call.time_fallback`` activity row
 saying so.  Everything else follows the file path: the MP3 is spooled to
@@ -234,7 +234,7 @@ TIME_BASIS_PARSED = "parsed"
 #: from one: the endpoint writes ``time_source='upload'`` either way, so a whole archive
 #: can be stamped with its upload date and nothing in the schema will say so.  That is not
 #: hypothetical (docs/MIGRATION.md, "Timestamps"): the backlog migration sends no
-#: ``dateTime`` on purpose, a parser bug rejected every pre-2025 filename, and 1,041,258
+#: ``dateTime`` on purpose, a parser bug rejected every pre-2025 filename, and a million
 #: calls were silently filed on the day they were uploaded.  So it is logged, counted, and
 #: for a *backlog* push — one that can simply be sent again — refused.
 TIME_BASIS_ARRIVAL = "arrival"
@@ -802,7 +802,7 @@ def build_upload_record(  # noqa: PLR0912, PLR0915 - one merge, read top to bott
         # Nothing in the push says when the call happened.  ``mtime`` is not a third
         # opinion here the way it is for a watched file: this file was written by *this
         # request*, seconds ago, so it and ``now()`` are the same wrong answer and both are
-        # labeled as what they are.  Every one of the 1,041,258 backlog calls that landed
+        # labeled as what they are.  Every one of the million backlog calls that landed
         # on their upload date came out of this branch (docs/MIGRATION.md, "Timestamps").
         started_at = (mtime or datetime.now(UTC)) - timedelta(seconds=duration)
         time_basis = TIME_BASIS_ARRIVAL
@@ -882,6 +882,15 @@ def build_upload_record(  # noqa: PLR0912, PLR0915 - one merge, read top to bott
     alias = (form.get("talkgroupLabel") or "").strip() or (
         base.talkgroup_alias if base is not None else None
     )
+    # The decoder the filename or ID3 named, else the one the push says it used — trunkd
+    # sends ``decoder=NBFM`` on a conventional-channel call and nothing on a P25 one.  It
+    # becomes the protocol of a system this push *creates* (so ``infer_trunked`` says no
+    # and Broadcastify Calls refuses it by rule, not by the blank-protocol default); it
+    # never fills in an existing system's protocol (``decoder_from_form``).
+    decoder = base.decoder if base is not None else id3.decoder
+    decoder_from_form = False
+    if not decoder and (form_decoder := (form.get("decoder") or "").strip()):
+        decoder, decoder_from_form = form_decoder, True
 
     # ``raw_meta`` keeps whatever the recorder chose to tell us that has no column of its
     # own — trunk-recorder's per-transmission ``frequencies``, its service tag, its slot —
@@ -918,7 +927,8 @@ def build_upload_record(  # noqa: PLR0912, PLR0915 - one merge, read top to bott
         # trunkd names the receive site in the form; sdrtrunk only ever says it in ID3.
         site=(form.get("site") or "").strip() or (base.site if base is not None else id3.site),
         channel_name=base.channel_name if base is not None else id3.channel_name,
-        decoder=base.decoder if base is not None else id3.decoder,
+        decoder=decoder,
+        decoder_from_form=decoder_from_form,
         channel=base.channel if base is not None else id3.channel,
         frequency_hz=_int(form.get("frequency")) or (base.frequency_hz if base is not None else None),
         tgid=tgid,
@@ -1005,7 +1015,13 @@ def store_upload(
     wacn = record.radio.wacn if record.radio and record.radio.wacn else None
     # Raises ``UnknownSystem`` when the push named no system and there is no single one to
     # attach it to; the endpoint turns that into "incomplete call data: no system".
-    system_id = resolve_system_id(session, record.system, protocol=record.decoder, wacn=wacn)
+    system_id = resolve_system_id(
+        session,
+        record.system,
+        protocol=record.decoder,
+        wacn=wacn,
+        fill_protocol=not record.decoder_from_form,
+    )
     site_id = upsert_site(session, system_id, record.site)
 
     group_name = record.talkgroup_group
@@ -1922,6 +1938,21 @@ def call_upload(  # noqa: PLR0913 - the wire contract is a flat form
     # content is ignored rather than refused: a garbled quality report must never cost the
     # recorder its call (docs/RECORDERS.md, "Best source").
     sourceQuality: Annotated[str | None, Form()] = None,  # noqa: N803 - the wire spells it so
+    # trunkd's analog conventional channels (``[[channel]]``): ``mode=nbfm`` and
+    # ``decoder=NBFM`` mark the call as analog narrowband FM, the rest is what the channel
+    # measured — the configured and the detected CTCSS/DCS tone, why squelch closed, the
+    # SNR, the peak deviation and the carrier offset.  All of it lands in ``raw_meta`` for
+    # the call page; ``decoder`` also names a *new* system's protocol (never an existing
+    # one's), and ``mode``/``decoder`` keep the call out of Broadcastify Calls, which takes
+    # trunked systems only (app.exporters.gate.is_analog_call, docs/EXPORTERS.md).
+    mode: Annotated[str | None, Form()] = None,
+    decoder: Annotated[str | None, Form()] = None,
+    tone: Annotated[str | None, Form()] = None,
+    toneDetected: Annotated[str | None, Form()] = None,  # noqa: N803 - the wire spells it so
+    squelchReason: Annotated[str | None, Form()] = None,  # noqa: N803
+    snrDb: Annotated[str | None, Form()] = None,  # noqa: N803
+    peakDeviationHz: Annotated[str | None, Form()] = None,  # noqa: N803
+    offsetHz: Annotated[str | None, Form()] = None,  # noqa: N803
     # Unit-to-unit (private) calls.  ``call_kind=unit`` says this recording is one radio
     # talking to one radio rather than traffic on a talkgroup, and ``target_radio_id`` names
     # the far end.  A push that sends neither is a group call, which is what every recorder
@@ -2055,6 +2086,14 @@ def call_upload(  # noqa: PLR0913 - the wire contract is a flat form
                 "keyId": keyId,
                 "durationMs": durationMs,
                 "sourceQuality": sourceQuality,
+                "mode": mode,
+                "decoder": decoder,
+                "tone": tone,
+                "toneDetected": toneDetected,
+                "squelchReason": squelchReason,
+                "snrDb": snrDb,
+                "peakDeviationHz": peakDeviationHz,
+                "offsetHz": offsetHz,
                 "call_kind": kind,
                 "target_radio_id": target_radio_id,
                 "broadcastifyOutcome": broadcastifyOutcome,

@@ -379,7 +379,7 @@ def test_a_private_call_reconciles_inline_even_when_the_radio_has_several_rows( 
 ) -> None:
     """The production miss.  P25 LC opcode 9 rides some transmissions and not others, so one
     unit is filed bare *and* under every home-system spelling it was ever heard with —
-    radio 5238001 has five ``radios`` rows on production.  Reconciliation resolves a
+    one radio can have five ``radios`` rows.  Reconciliation resolves a
     record's radios before the call is written, and while that lookup asked only for "a row
     with this ``radio_id``" it got whichever row came back last: the pair it built named
     rows no stored call carries, the candidate query returned nothing, and both recorders'

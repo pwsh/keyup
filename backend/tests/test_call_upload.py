@@ -647,6 +647,126 @@ def test_is_trunkd_form() -> None:
     assert not upload_module.is_trunkd_form({})
 
 
+# --------------------------------------------------------------------------------------
+# trunkd conventional (analog NBFM) channels
+# --------------------------------------------------------------------------------------
+
+#: what trunkd sends for a ``[[channel]]`` call (trunkd docs/keyup.md §1): a group call on
+#: the channel's synthetic talkgroup, no keying radio, and the analog facts in extras.
+NBFM_FIELDS = {
+    "sources": "[]",
+    "source": None,
+    "nac": None,
+    "frequency": "155205000",
+    "frequencies": '[{"freq": 155205000, "pos": 0, "len": 1.5}]',
+    "talkgroup": "1",
+    "talkgroupLabel": "EXAMPLE EMS F-2",
+    "site": "Example Tower",
+    "mode": "nbfm",
+    "decoder": "NBFM",
+    "tone": "192.8",
+    "toneDetected": "192.8",
+    "squelchReason": "carrier_lost",
+    "snrDb": "21.5",
+    "peakDeviationHz": "2400",
+    "offsetHz": "-120",
+}
+
+
+def _post_nbfm(client, system_label: str, **fields):  # noqa: ANN001, ANN003, ANN202
+    return post_trunkd(
+        client,
+        ("Example_1_1756494000.wav", wav_bytes(), "audio/wav"),
+        audioName="Example_1_1756494000.wav",
+        audioType="audio/wav",
+        systemLabel=system_label,
+        **{**NBFM_FIELDS, **fields},
+    )
+
+
+def test_an_nbfm_push_names_a_new_system_nbfm(client, session, token) -> None:  # noqa: ANN001
+    """A system first seen from a trunkd conventional channel is not trunked, by protocol."""
+    from app.exporters import gate
+    from app.models import System, infer_trunked
+
+    assert _post_nbfm(client, "Example County EMS").text == OK
+
+    system = session.scalars(select(System)).one()
+    assert system.name == "Example County EMS"
+    assert system.protocol == "NBFM"
+    assert system.trunked is None  # nobody overruled the guess…
+    assert infer_trunked(system.protocol) is False  # …and the guess says "not trunked"
+    assert system.is_trunked is False
+    call = session.scalars(select(Call)).one()
+    assert call.decoder == "NBFM"
+    assert call.talkgroup_ids == [1]
+    # the analog extras ride in raw_meta for the detail page
+    for key in ("mode", "tone", "toneDetected", "squelchReason", "snrDb", "peakDeviationHz", "offsetHz"):
+        assert call.raw_meta[key] == NBFM_FIELDS[key]
+    assert gate.trunked_ok(session, call, "broadcastify") is False
+
+
+@pytest.mark.parametrize("protocol", [None, "P25 Phase 1"])
+def test_an_nbfm_push_never_relabels_an_existing_system(client, session, token, protocol) -> None:  # noqa: ANN001
+    """Existing systems are never rewritten — not even a NULL protocol filled in.
+
+    A channel filed under an existing label describes one channel, not the system; letting
+    its ``NBFM`` complete a blank protocol would flip a system that is trunked in fact (but
+    never said so) to "not trunked" for every call it has.
+    """
+    from app.models import System
+
+    session.add(System(name="Example System", protocol=protocol))
+    session.commit()
+
+    assert _post_nbfm(client, "Example System").text == OK
+
+    session.expire_all()
+    system = session.scalars(select(System)).one()
+    assert system.protocol == protocol
+    # the call itself still says what it was
+    assert session.scalars(select(Call)).one().decoder == "NBFM"
+
+
+def test_fill_protocol_false_holds_when_the_upsert_fills_a_wacn(session) -> None:  # noqa: ANN001
+    """The upsert branch (a column still NULL that this call fills) honours it too."""
+    from app.ingest.service import upsert_system
+    from app.models import System
+
+    session.add(System(name="Example System"))
+    session.commit()
+    upsert_system(session, "Example System", protocol="NBFM", wacn=101010, fill_protocol=False)
+    session.commit()
+
+    session.expire_all()
+    system = session.scalars(select(System)).one()
+    assert (system.protocol, system.wacn) == (None, 101010)
+
+
+def test_a_trunkd_p25_push_is_unchanged(client, session, token) -> None:  # noqa: ANN001
+    """No ``decoder`` field (every P25 push trunkd has ever sent): nothing new happens."""
+    from app.models import System
+
+    post_trunkd(client, ("1701-1756494000.wav", wav_bytes(), "audio/wav"), audioName="1701-1756494000.wav")
+
+    system = session.scalars(select(System)).one()
+    assert system.protocol is None
+    call = session.scalars(select(Call)).one()
+    assert call.decoder is None
+    assert "mode" not in call.raw_meta and "decoder" not in call.raw_meta
+
+
+def test_the_id3_decoder_still_wins_over_the_form(client, session, token, tagged_mp3) -> None:  # noqa: ANN001
+    """The form is only a fallback: a recording that names its decoder keeps it."""
+    from app.models import System
+
+    assert post(client, tagged_mp3, decoder="NBFM").text == OK
+
+    call = session.scalars(select(Call)).one()
+    assert call.decoder and call.decoder != "NBFM"
+    assert session.scalars(select(System)).one().protocol == call.decoder
+
+
 def test_the_source_id_extension_fills_the_radio_home(client, session, token) -> None:  # noqa: ANN001
     """`sourceWacn`/`sourceSystem` are P25 LC opcode 9 (docs/NON-VOICE-DATA.md §3.2).
 
@@ -1387,7 +1507,7 @@ def test_a_database_error_queueing_audio_processing_does_not_roll_back_the_call(
 class TestMillisecondCallStart:
     """``dateTime`` is whole seconds, and a 0.65 s call cannot survive that rounding.
 
-    Production calls 2395971 and 2395972 are one 0.648 s key-up on TRANSIT, heard by both
+    The key-up pair are one 0.648 s key-up on TRANSIT, heard by both
     recorders and stamped 04:59:32 and 04:59:33 — two intervals that never touch, so
     reconciliation had nothing to measure and stored both as primaries.  trunkd sends
     ``startMs`` alongside ``dateTime`` from 2026-09-10; ``dateTime`` stays the fallback

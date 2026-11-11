@@ -4763,6 +4763,22 @@ export interface components {
       durationMs?: string | null;
       /** Sourcequality */
       sourceQuality?: string | null;
+      /** Mode */
+      mode?: string | null;
+      /** Decoder */
+      decoder?: string | null;
+      /** Tone */
+      tone?: string | null;
+      /** Tonedetected */
+      toneDetected?: string | null;
+      /** Squelchreason */
+      squelchReason?: string | null;
+      /** Snrdb */
+      snrDb?: string | null;
+      /** Peakdeviationhz */
+      peakDeviationHz?: string | null;
+      /** Offsethz */
+      offsetHz?: string | null;
       /** Call Kind */
       call_kind?: string | null;
       /** Target Radio Id */

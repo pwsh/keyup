@@ -1,6 +1,6 @@
 """OpenVINO Model Server (OVMS) speech-to-text backend (ARCHITECTURE §5.2).
 
-Intel's own inference server — ``openvino/model_server`` — serves whisper on the production
+Intel's own inference server — ``openvino/model_server`` — serves whisper on a Lunar Lake
 host's Arc 140V iGPU *and* on its AI Boost NPU, which is the one thing our own
 ``stt-openvino`` sidecar cannot do (openvino-genai's NPU whisper path throws on every clip on
 this SKU; ``docs/STT.md``).  It speaks a *subset* of the OpenAI Audio API on a different

@@ -593,7 +593,7 @@ def test_an_emptied_thread_another_system_points_at_is_kept(session, settings, t
 # --------------------------------------------------------------------------------------
 # the lock order, and losing a race for it
 #
-# The production failure: phase B aborted at 86 % of 1,041,258 rows with
+# The real-world failure: phase B aborted most of the way through a million rows with
 #   Process A waits for advisory lock [16384,4242,6,2]; blocked by process B.
 #   Process B waits for advisory lock [16384,4242,2,2]; blocked by process A.
 # — two transactions, each holding several of the per-talkgroup conversation locks, each

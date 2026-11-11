@@ -159,7 +159,7 @@ const depthOf = (span: ToneSpan): number => {
 /**
  * The gain automation that puts the tone dip back, from `from` seconds onward.
  *
- * The compressor undoes the work the §5.5 pass did. Production call 2396243 is a 2 s
+ * The compressor undoes the work the §5.5 pass did. The tone-only call is a 2 s
  * console attention tone the server took down to about -33 dB in the stored file —
  * and Normalize, seeing a call whose only loud thing is that tone, compresses it and
  * then applies 18 dB of make-up, handing it straight back at full blast. So while

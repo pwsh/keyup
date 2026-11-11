@@ -406,8 +406,8 @@ def matches(rule: AlertRule, call: Call, summary: CallSummary) -> bool:
     if rule.kind == "talkgroup":
         # Ids are on-air tgids — what the radio network calls them, and what
         # ``calls.talkgroup_ids`` holds — and nothing else.  They used to match the
-        # ``talkgroups.id`` primary key as well, and the two number spaces overlap (43
-        # collisions on production when c2d54c0 fixed the same bug in ``?talkgroup=``), so
+        # ``talkgroups.id`` primary key as well, and the two number spaces overlap (dozens
+        # of collisions on a real archive when the same bug was fixed in ``?talkgroup=``), so
         # a rule for one channel also fired on another.  Migration 0ebc81310604 rewrote the
         # stored pks.  A tgid two systems share is told apart by the rule's ``system``.
         wanted = _rule_ids(rule, "talkgroup_ids", "talkgroups", "tgids")

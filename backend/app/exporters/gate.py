@@ -44,7 +44,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, cast, or_, select
+from sqlalchemy import ColumnElement, and_, cast, func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 from sqlalchemy.types import Integer
@@ -71,7 +71,10 @@ __all__ = [
     "SELECTION_MODES",
     "SETTINGS_SERVICE",
     "TRUNKED_ONLY_SERVICES",
+    "ANALOG_CALL_MARKS",
     "UNIT_CALL",
+    "analog_call_clause",
+    "is_analog_call",
     "settings_service",
     "trunked_clause",
     "trunked_ok",
@@ -341,15 +344,55 @@ def system_trunked(session: Session | None, system_id: Any) -> bool:
     return bool(row is not None and row.is_trunked)
 
 
+#: What a recorder writes into ``raw_meta`` (``mode`` / ``decoder``) for an analog
+#: conventional call.  trunkd sends ``mode=nbfm`` and ``decoder=NBFM`` on every call from a
+#: ``[[channel]]`` (and on nothing else); compared case-insensitively.
+ANALOG_CALL_MARKS = ("nbfm",)
+
+
+def is_analog_call(call: Any) -> bool:
+    """Did the recorder say, *on this call*, that it is analog narrowband FM?
+
+    Read from ``raw_meta`` rather than from the system, as defence in depth: a conventional
+    channel an operator chose to file under a trunked system's label would otherwise pass
+    :func:`system_trunked` and reach Broadcastify Calls.  Only the recorder's own top-level
+    ``mode``/``decoder`` keys count — nothing is inferred from ``audio_type``, which
+    trunk-recorder also sets to ``analog`` for the analog talkgroups of a trunked system.
+    """
+    meta = getattr(call, "raw_meta", None)
+    if not isinstance(meta, dict):
+        return False
+    return any(
+        isinstance(meta.get(key), str) and meta[key].strip().lower() in ANALOG_CALL_MARKS
+        for key in ("mode", "decoder")
+    )
+
+
+def analog_call_clause() -> ColumnElement[bool]:
+    """:func:`is_analog_call` as SQL over ``calls.raw_meta`` (NULL-safe: no key → false)."""
+    return or_(
+        *(
+            func.lower(func.btrim(func.coalesce(Call.raw_meta[key].astext, ""))).in_(
+                ANALOG_CALL_MARKS
+            )
+            for key in ("mode", "decoder")
+        )
+    )
+
+
 def trunked_ok(session: Session | None, call: Any, service: str) -> bool:
     """Does this call's system satisfy the service's trunked rule?
 
-    Every service but Broadcastify Calls answers ``True`` unconditionally.  Without a
-    session there is nothing to look up, and the answer is deferred to the SQL half rather
-    than guessed — the worker always has one, so this only affects direct callers.
+    Every service but Broadcastify Calls answers ``True`` unconditionally.  For Calls, an
+    analog conventional call (:func:`is_analog_call`) is refused whatever its system says.
+    Otherwise, without a session there is nothing to look up, and the answer is deferred to
+    the SQL half rather than guessed — the worker always has one, so this only affects
+    direct callers.
     """
     if service not in TRUNKED_ONLY_SERVICES:
         return True
+    if is_analog_call(call):
+        return False
     if session is None:  # pragma: no cover - defensive; the worker always has one
         return True
     return system_trunked(session, getattr(call, "system_id", None))
@@ -383,7 +426,10 @@ def trunked_clause(service: str) -> ColumnElement[bool] | None:
     """
     if service not in TRUNKED_ONLY_SERVICES:
         return None
-    return select(System.id).where(System.id == Call.system_id, trunked_system_clause()).exists()
+    return and_(
+        select(System.id).where(System.id == Call.system_id, trunked_system_clause()).exists(),
+        ~analog_call_clause(),
+    )
 
 
 def trunked_systems(session: Session) -> list[System]:

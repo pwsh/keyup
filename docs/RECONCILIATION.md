@@ -54,7 +54,7 @@ is the trade the cap is chosen to make.
 (when the archive can resolve one — `Interval.source_radio`), their starts within
 `SHORT_CALL_MAX_START_DELTA_S` (**1.0 s**) of each other, and their lengths within
 `SHORT_CALL_MAX_DURATION_DELTA_S` (**0.25 s**). This is the rung for a recorder that reports its call start in
-**whole seconds**: production calls 2395971 and 2395972 are one 0.648 s key-up on a bus-fleet talkgroup by one radio, heard by both
+**whole seconds**: one measured pair is a single 0.648 s key-up on a bus-fleet talkgroup by one radio, heard by both
 recorders, stamped 04:59:32 and 04:59:33 — two intervals with a 0.352 s *gap* between them, so rung 1 has no overlap
 to measure and rung 2's allowance (capped at 0.648 s) is smaller than the second between them. Both copies were stored
 as primaries. (The other half of that fix is the push path's millisecond `startMs` upload field — this rung
@@ -85,8 +85,8 @@ A.id`, a recorder retransmitting a file — matched `B`, followed `B` home to `A
 `(A, A)`. Two identical rows score identically; a tie leaves the *existing* primary in place and demotes the newcomer;
 newcomer and existing were the same row. The write was `A.duplicate_of = A.id`, which hides the call from every listing
 (they all filter `duplicate_of IS NULL`), takes it out of its conversation, and — if its transcript was still pending —
-marks it `skipped` with its jobs cancelled. **18,708 rows on production**, roughly 2,000 live calls a day plus every
-2022 backlog recording.
+marks it `skipped` with its jobs cancelled. On a large archive that was **tens of thousands of rows** — live calls
+every day plus every migrated backlog recording.
 
 Two things fix it. `_find` now checks the *primary* against the exclusion list as well, and falls through to the
 interval rung when it is excluded, exactly as if the hash had hit nothing — the guard the interval rung has always had
@@ -102,9 +102,9 @@ Rows already written that way are freed by `keyup repair-self-duplicates` (§7).
 Identical bytes prove the same *recording*, not the same transmission. A short recording with no voice in it — a
 squelch tail, a grant with nothing on it, 0.14–2 s — encodes to **byte-identical** MP3 bytes every time, so one hash
 spreads across hundreds of unrelated calls months and talkgroups apart, and the first row carrying it became the
-"original" of all of them. Production ruled call 2250773 — a 1.7 s *unit* call on 2026-09-08 10:13 — a duplicate of
-call 8371, a 1.7 s *group* call on talkgroup 2 from 2026-08-31, rule `identical sha256`: **927 rows** (924 group, 3
-unit) whose primary started more than 300 s away, one hash alone covering 155 of them.
+"original" of all of them. On one large archive a 1.7 s *unit* call was ruled a duplicate of a 1.7 s *group* call on
+another talkgroup recorded a week earlier, rule `identical sha256` — and it was one of **hundreds of rows** whose
+primary started more than 300 s away, one hash alone covering over a hundred of them.
 
 So an exact-hash hit counts only when the primary it resolves to started within `EXACT_HASH_MAX_SKEW_S` (60 s) of the
 caller's own start — two recorders' copies of one key-up differ by a second or two of clock skew, and a retransmitted
@@ -397,7 +397,7 @@ keyup reconcile --system "Example System" # then do it
 ```
 
 **Freeing calls hidden behind their own id.** The exact-hash rung's missing exclusion check (§1) wrote
-`duplicate_of = <the row's own id>` onto 18,708 production calls. They are not lost — the bytes, the metadata and any
+`duplicate_of = <the row's own id>` onto every call it matched (tens of thousands on a large archive). They are not lost — the bytes, the metadata and any
 finished transcript are all still on the row — but nothing can reach them. Deploy the `_find` fix first, or the next
 pass writes the same rows again; then:
 
@@ -413,7 +413,7 @@ it was *ingested* in, so the 2022 backlog goes behind today's traffic rather tha
 or `empty`, or that already has a transcript, is left exactly as it is. Committed every `--batch` rows so the live feed
 keeps flowing beside it; safe to interrupt and safe to re-run, since a repaired row no longer points at itself.
 
-**Freeing calls hidden behind a hash from another day.** The exact rung's missing time check (§1) folded 927 production
+**Freeing calls hidden behind a hash from another day.** The exact rung's missing time check (§1) folded hundreds of
 calls into unrelated recordings that happened to encode to the same bytes. Deploy the `_find` fix first; then:
 
 ```

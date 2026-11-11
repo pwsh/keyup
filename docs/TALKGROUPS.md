@@ -13,7 +13,7 @@ keeping their own copy — the API serves it at `GET /api/directory/vocabulary` 
 
 The three fields are edited together in the talkgroup dialog on the **Talkgroups** page, on
 a batch of channels at once in the bulk-edit drawer, and in bulk from a playlist CSV
-(`keyup import-playlist`) or a RadioReference sync.
+(`keyup playlist import`) or a RadioReference sync.
 
 ---
 

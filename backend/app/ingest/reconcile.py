@@ -443,8 +443,8 @@ def matches(a: Interval, b: Interval, cfg: ReconcileConfig) -> MatchResult:
     # its call start in whole seconds (the push path's ``dateTime``) can stamp a 0.648 s
     # transmission at 04:59:32 on one receiver and 04:59:33 on the other; the two intervals
     # then do not touch, so rung 1 has nothing to measure and rung 2's allowance — capped at
-    # the shorter recording, 0.648 s — is smaller than the second between them.  Production
-    # calls 2395971 and 2395972 are that pair.  What is left to go on is that both are far
+    # the shorter recording, 0.648 s — is smaller than the second between them.  A recorded
+    # key-up pair was exactly that.  What is left to go on is that both are far
     # too short to be two separate transmissions this close together, that they are on the
     # same channel, that they last the same length to within a rounding, and that the same
     # radio keyed both — so all four are required, and the whole rung is confined to
@@ -696,7 +696,7 @@ def _find(
     and the hash query drops those rows — but the row it *returns* is then followed to its
     primary, and a copy of the caller (``B.duplicate_of == A.id``, the same bytes uploaded
     twice) resolves straight back to ``A``.  Returning it made :func:`reconcile_pair` rule
-    on ``(A, A)``, tie, and write ``A.duplicate_of = A.id`` — 18,708 rows on production,
+    on ``(A, A)``, tie, and write ``A.duplicate_of = A.id`` — tens of thousands of rows on a large archive,
     every one of them hidden from the API behind its own id (``app.repair_self_duplicates``
     is the repair).  So the primary is checked against ``exclude`` too, and an excluded one
     falls through to the interval rung exactly as if the hash had hit nothing, which is the
@@ -705,10 +705,10 @@ def _find(
     **Nor is a hash hit from another day.**  Identical bytes prove the same *recording*,
     not the same transmission: a short recording with no voice in it — a squelch tail, a
     grant with nothing on it, 0.14-2 s — encodes to byte-identical MP3 bytes every time,
-    so one hash spreads across hundreds of unrelated calls.  Production ruled call 2250773
-    (a 1.7 s unit call on 2026-09-08 10:13) a duplicate of call 8371 (a 1.7 s *group* call
-    on talkgroup 2 from 2026-08-31), rule ``identical sha256``; 927 rows were hidden that
-    way and one hash alone covered 155 of them.  So the resolved primary's ``started_at``
+    so one hash spreads across hundreds of unrelated calls.  A 1.7 s unit call was once
+    ruled a duplicate of a 1.7 s *group* call on another talkgroup a week earlier, rule
+    ``identical sha256``; hundreds of rows were hidden that way and one hash alone covered
+    over a hundred of them.  So the resolved primary's ``started_at``
     must be within ``EXACT_HASH_MAX_SKEW_S`` of this interval's start — two recorders'
     copies of one key-up differ by a second or two of clock skew, and a retransmitted file
     carries its original timestamp — and a hit outside that window is skipped exactly like
@@ -1261,8 +1261,8 @@ def reconcile_pair(
     """
     if newcomer.id is not None and newcomer.id == other.id:
         # A row is not a copy of itself.  Nothing should ever ask — :func:`_find` refuses to
-        # return the caller on either rung — but this ran for five days on production and wrote
-        # ``duplicate_of = id`` onto 18,708 calls, hiding each one from every listing behind
+        # return the caller on either rung — but this ran for days on a live archive and wrote
+        # ``duplicate_of = id`` onto tens of thousands of calls, hiding each one from every listing behind
         # its own id, so the last line of defense is here, where the write happens.  A no-op
         # outcome rather than an exception: the caller is an ingest or a batch pass, and a
         # raise here would fail an upload over a row that is already stored correctly.
@@ -1710,7 +1710,13 @@ def reconcile_lookup(session: Session, record: Any, settings: Settings) -> Uploa
     # ``System`` from a label the recorder never sent — and for a while it was: the write
     # path was fixed and an unlabeled push still created its system here, one step
     # earlier.  Raises ``UnknownSystem``, which the endpoint answers as a bad push.
-    system_id = resolve_system_id(session, record.system, protocol=record.decoder, wacn=wacn)
+    system_id = resolve_system_id(
+        session,
+        record.system,
+        protocol=record.decoder,
+        wacn=wacn,
+        fill_protocol=not getattr(record, "decoder_from_form", False),
+    )
     # The locks are taken after the system is resolved, not before: a unit call's channel
     # key is its pair of ``radios`` rows, and those are per-system.  Resolving the system
     # takes no lock and writes nothing (it raises rather than minting one), so nothing has

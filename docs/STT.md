@@ -176,6 +176,10 @@ OV_DEVICE=GPU
 RENDER_GID=992
 ```
 
+Left unset, `OV_MODEL` is `OpenVINO/whisper-medium-fp16-ov`, the recommendation of §3.8.
+`whisper-large-v3-turbo-int8-ov` is faster and hears some details the others miss, but it
+collapses on some long calls (§3.6); choose it knowingly.
+
 ```sh
 docker compose up -d stt-openvino
 docker compose logs -f stt-openvino     # first start downloads the model and compiles it

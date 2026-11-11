@@ -58,7 +58,7 @@ def backend_from_env() -> OpenVINOLocalBackend:
     """Build the served backend from ``OV_*`` environment variables (compose sets these)."""
     return OpenVINOLocalBackend(
         name=os.environ.get("OV_NAME", "openvino"),
-        model=os.environ.get("OV_MODEL", "OpenVINO/whisper-large-v3-turbo-int8-ov"),
+        model=os.environ.get("OV_MODEL", "OpenVINO/whisper-medium-fp16-ov"),
         device=os.environ.get("OV_DEVICE", "CPU"),
         cache_dir=os.environ.get("OV_CACHE_DIR") or None,
         cpu_threads=int(os.environ.get("OV_CPU_THREADS", "4")),

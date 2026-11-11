@@ -243,11 +243,11 @@ def test_detail_carries_the_transcript_neighbors_and_raw_metadata(client, archiv
 
 
 def test_a_discarded_call_serializes(client, archive, session) -> None:
-    """`ecf6715` added `audio_state='discarded'` and left `CallOut` naming three values.
+    """A change that added `audio_state='discarded'` left `CallOut` naming three values.
 
     Every call the discard pass had taken then answered its own detail endpoint with an
     HTTP 500 out of pydantic — 13 % of recent calls, and exactly the ones an operator
-    clicks when something sounds wrong.  Reproduced on production 2403371 and 2404082.
+    clicks when something sounds wrong.  Reproduced on two recorded calls.
     """
     from app.models import Call
 

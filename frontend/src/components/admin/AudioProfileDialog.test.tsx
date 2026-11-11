@@ -137,9 +137,9 @@ describe("AudioProfileDialog", () => {
 
   it("prefills the preview from the call the Tune… link carried", async () => {
     renderWithProviders(
-      <AudioProfileDialog open onOpenChange={vi.fn()} profile={aircraft} callId="1103864" />,
+      <AudioProfileDialog open onOpenChange={vi.fn()} profile={aircraft} callId="123456" />,
     );
-    expect(await screen.findByLabelText(/call id/i)).toHaveValue(1103864);
+    expect(await screen.findByLabelText(/call id/i)).toHaveValue(123456);
   });
 
   it("shows the server's own sentence when it refuses a chain", async () => {

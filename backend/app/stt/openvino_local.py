@@ -1,6 +1,6 @@
 """In-process transcription on Intel accelerators with OpenVINO GenAI (ARCHITECTURE §5.2).
 
-The production host is a Core Ultra 7 258V (Lunar Lake): an Arc 140V iGPU on
+The reference host it was built on is a Core Ultra 7 258V (Lunar Lake): an Arc 140V iGPU on
 ``/dev/dri/renderD128`` and an "AI Boost" NPU on ``/dev/accel/accel0``.  ``openvino_genai``'s
 ``WhisperPipeline`` runs whisper on any of them — ``device`` is just a string, ``CPU``, ``GPU``,
 ``NPU`` or ``AUTO`` — so one backend class covers all three and the router picks by priority.

@@ -41,8 +41,8 @@ is filed under
 **The date is the call's own** `started_at`, rendered in `TZ` (the same zone `started_local` uses), and it is decided
 *after* the record is built, never from the form before the recording has been parsed. That is the whole rule, and
 getting it wrong is what this layout exists to fix: `upload_path` used to take the date from the push, so a backlog
-migration streaming a 2022–2024 archive across one afternoon put **972,347 files in `uploads/2026/09/01`** and 82,174
-in `uploads/2026/08/31`. ext4's `dir_index` keeps a directory that size functionally fine — a lookup by name is a hash
+migration streaming a 2022–2024 archive across one afternoon put **nearly a million files in one `uploads/YYYY/MM/DD`**
+directory. ext4's `dir_index` keeps a directory that size functionally fine — a lookup by name is a hash
 probe — but nothing that *doesn't* look up by name is fine: `readdir` returns hash order, so `rsync`, `find`, a
 backup and any directory walk pay for the whole directory and then seek all over the disk. Partitioned by call date
 the same archive spreads over roughly 1,100 real days.
@@ -752,8 +752,8 @@ non-key updates of `calls`. `backend/tests/test_lock_export_deadlock.py` reprodu
 threads and asserts the compiled statement.
 
 **Caption-credit and sign-off families.** The exact phrase list only fires on an utterance that matches character
-for character, and whisper's YouTube-caption credits are endlessly variable — a survey of this archive found 1,005
-transcripts containing "captioning provided by" in a dozen spellings, 913 still labeled `good`. `postprocess` also
+for character, and whisper's YouTube-caption credits are endlessly variable — a survey of one large archive found about a thousand
+transcripts containing "captioning provided by" in a dozen spellings, most of them still labeled `good`. `postprocess` also
 carries compiled pattern families (`HALLUCINATION_PATTERNS`), matched case-insensitively against the normalized
 text:
 
@@ -867,7 +867,7 @@ when it does not. The operator's `POST /api/admin/jobs/requeue` runs the *same* 
 `last_error` cleared — so the manual and the automatic recovery cannot drift apart.
 
 **A recording every backend chokes on is not an outage.** Because the unpark pass gives the attempts back, a job
-misread as an outage never runs out of them: on 2026-09-23 call 5237413, a 43 s BOLO that sends large-v3 into a
+misread as an outage never runs out of them: one 43 s BOLO in a busy archive, a recording that sends large-v3 into a
 repetition loop when the domain prompt is attached, timed out on all three GPU-server backends while they transcribed
 everything else, parked as `backend_unavailable`, was requeued, and went round for two hours. So the router now
 tells the two apart. Each backend error says whether it `reached` the server (a read timeout or an HTTP status did;
@@ -972,10 +972,10 @@ settings table winning; the worker re-reads them every cycle. [EXPORTERS.md](EXP
 
 ### 5.5 Audio processing
 Calls are recorded as the receiver heard them, and on a live P25 system that is not a consistent product.
-Measured over six hours of this archive: the mean level spans **20 dB** between the tenth percentile (-42 dBFS)
+Measured over six hours of one county's traffic: the mean level spans **20 dB** between the tenth percentile (-42 dBFS)
 and the loudest call (-21); **a third of calls carry more than half a second of dead air** before anybody
 speaks (0.5 s on average); some 0.5 s "calls" are empty (-80 dBFS); and a fire page opens with two pure tones
-that are the loudest thing in the day (call 1103864, 625 Hz for 1.15-2.11 s then 750 Hz for 2.18-5.09 s).
+that are the loudest thing in the day (one measured page: 625 Hz for 1.15-2.11 s then 750 Hz for 2.18-5.09 s).
 Playing that back raw means riding the volume knob.
 
 So every stored call gets a **processed copy** — `<stem>.proc.mp3`, beside the original, at the original's
@@ -1015,11 +1015,11 @@ The default chain on a short untrimmed call at -30 dBFS is
 that used to be there for everything.
 
 **The gate follows the clip.** `audio_gate_db` alone is an absolute threshold applied *before* the gain, and
-that is only the right number for a call that arrived at a normal level. Production 2402904 measures
+that is only the right number for a call that arrived at a normal level. One static clip measures
 -46.28 dBFS whole-clip, so the -50 dB default sat **3.7 dB under the content**: a 4:1 downward ratio was
 applied to the speech itself, and the `volume=30dB` the chain asked for came out as 19. Measured over the last
 500 processed calls, **18 of the 18** calls more than 6 dB below the archive's median level are on the
-`volume` branch and not one is a `loudnorm` undershoot; 2405543 was given 30 dB and came out +16.1.
+`volume` branch and not one is a `loudnorm` undershoot; one quiet call was given 30 dB and came out +16.1.
 `gate_threshold_db` therefore reads `min(audio_gate_db, clamp(trimmed_mean - 30, -70, -40))`.
 
 Two properties made this the choice over the other candidate, *moving the gate behind the gain stage*. On a
@@ -1048,8 +1048,8 @@ stage.
 
 *`level=disabled`.* ffmpeg's `alimiter` defaults to `level=1`, "auto level", which normalizes its output so the
 loudest sample lands **exactly on** `limit`. That is a maximizer, not a limiter: it lifts a clip that was never
-close to clipping, and it makes the measured peak equal the ceiling by construction rather than as a cap. Call
-2402902 arrived peaking at -8.4 dBFS and left the pass pinned to the ceiling. With auto level off the filter
+close to clipping, and it makes the measured peak equal the ceiling by construction rather than as a cap. A call
+that arrived peaking at -8.4 dBFS and left the pass pinned to the ceiling. With auto level off the filter
 only ever attenuates, which is the whole job. `attack=5:release=50` are the filter's own defaults, written out
 so the chain recorded in `audio_meta.filter` says what it did.
 
@@ -1082,11 +1082,11 @@ not a filter.
 Duration alone cannot then separate a tone from a voice, and a 0.3 s floor on its own got it wrong in both
 directions: over seven days it flagged **291 calls `single`**, most of them 0.3-0.4 s at 300-600 Hz — held
 vowels, which the 24 dB attenuation then punched a hole in — while a **warble** that alternates 878.1 and
-467.9 Hz every 0.25 s (calls 1170192, 1170733) produced nothing at all, and one where only the high halves
-cleared the dominance test (1169412) was attenuated on those halves alone. What actually separates them is
+467.9 Hz every 0.25 s (two such calls) produced nothing at all, and one where only the high halves
+cleared the dominance test (the *partial warble*) was attenuated on those halves alone. What actually separates them is
 **frequency stability**: an encoder holds its frequency for the whole run and a voice does not. Every run is
 measured as the 90th-percentile deviation of its per-frame interpolated peak from the run's median — 0.0-0.8 Hz
-on 1169412's tone halves against 18-25 Hz on 1170568's vowel — and `MAX_FREQ_SPREAD_HZ = 6.0` is the gate
+on the partial warble's tone halves against 18-25 Hz on a held vowel — and `MAX_FREQ_SPREAD_HZ = 6.0` is the gate
 (`_FREQ_TOLERANCE_HZ = 45` still decides only where one run *ends*). Duration is then applied by context:
 
 | Rule | Each run | Also | Pattern |
@@ -1097,18 +1097,18 @@ on 1169412's tone halves against 18-25 Hz on 1170568's vowel — and `MAX_FREQ_S
 | one left over | ≥ 0.5 s | ≥ 55 % dominant, spread ≤ 6 Hz | `single` |
 | one left over, **held** | ≥ 1.0 s | ≥ 45 % dominant, spread ≤ `MAX_SINGLE_SPREAD_HZ = 20 Hz` | `single` |
 
-The second `single` row is the **held-tone** rule, added for call 2394781 (talkgroup 1001): 1.41 s of one
+The second `single` row is the **held-tone** rule, added for one dispatch call (the *held tone*): 1.41 s of one
 993.8 Hz tone at -14 dBFS, the loudest thing in the recording, 0.87-1.00 dominant in every frame — and rejected,
 because its interpolated peak wanders 18.3 Hz (p90). A vocoder does not reproduce a frequency the way an
 encoder generates one, so the encoder-grade 6 Hz gate throws real tones away once they have been through a
 vocoder, and this one went out at full level into a loudness stage that then set the clip's gain from it. The
 rule that lets it back in is duration and spread **together**: a full second inside ±20 Hz. Neither half decides
-anything alone — the false-positive vowel of call 1170568 measures 18.4 Hz of spread, the same number, and is
+anything alone — the false-positive vowel (the *held vowel*) measures 18.4 Hz of spread, the same number, and is
 excluded because its runs are 0.38 s and 0.16 s against a 7-day false-positive population that peaked at
 0.3-0.4 s. A run admitted this way is *isolated only*: it can never form a `two_tone` pair or a pattern, both of
 which still require every run to clear the tight 6 Hz limit. **Harmonic folding was tried and rejected** for the
 dominance fraction (counting the energy at 2× and 3× the peak as part of the tone): measured over the fixtures
-it lifts nine frames of the 1170568 *vowel* over the frame test and not one frame of 2394781's tone, because
+it lifts nine frames of the held *vowel* over the frame test and not one frame of the held tone, because
 speech is harmonic too and a voiced frame's peak is usually itself a harmonic.
 
 Repetition is the evidence a short run lacks on its own, which is why a pattern's runs may be a sixth of a
@@ -1118,7 +1118,7 @@ ends in halves that measure 7.6-8.2 Hz, and dropping them would end the attenuat
 
 **Adjacent includes overlapping by one hop.** A run's end is the end of its last *frame*, not of its last hop,
 so two runs consecutive in frame numbering report times that overlap by exactly one 16 ms hop. Testing that gap
-against zero rejected the very edges the absorb step exists to recover. Production call 2403028 is a
+against zero rejected the very edges the absorb step exists to recover. One recorded call is a
 878.1/467.9 Hz warble running **1.224 s to 4.312 s**, and its span stopped at **3.064 s**: two mid-warble halves
 failed the 6 Hz stability gate, which opened a 0.24 s hole wider than `MAX_PATTERN_GAP_S`, and the frayed edges
 past it could not be pulled back because they overlapped. The 1.25 s of warble left un-attenuated came out of
@@ -1137,8 +1137,8 @@ stage over the whole burst rather than six over its halves with the gaps at full
 own depth. A `two_tone`, `warble` or `alert` — somebody was toned out — is *information*: a listener wants to
 hear the page under the dispatch that follows it, so it gets `audio_page_tone_attenuate_db` (18 dB: off the top
 of the archive, still plainly there). A `single` is the console's held attention tone in front of a dispatch —
-call 2396065 is 1.95 s of 993 Hz at -10.5 dBFS before 17 s of speech — which carries nothing and is only loud,
-so it gets the deeper `audio_tone_attenuate_db` (24 dB shipped, 30 dB on this deployment). One setting for both
+one measured call has 1.95 s of 993 Hz at -10.5 dBFS before 17 s of speech — which carries nothing and is only loud,
+so it gets the deeper `audio_tone_attenuate_db` (24 dB shipped; 30 dB leaves only a marker). One setting for both
 was the old behaviour and could not be right for both at once: deep enough for the attention tone flattened the
 page, and shallow enough for the page left the attention tone as the loudest thing in the call.
 
@@ -1148,26 +1148,26 @@ would otherwise undo the work: the **export** loudness stage
 ([EXPORTERS.md](EXPORTERS.md), *Loudness*), which re-applies the envelope after its lift, and the **player's
 Normalize** compressor, which schedules the same dip on a gain node of its own while it is switched on
 (`frontend/src/components/player/normalize.ts`; off, it is not needed, because the stored file already carries
-it). Call 2396243 is what proves it: 3.38 s that is nothing but a 993 Hz tone, taken to -33 dB in the archive and
+it). A tone-only call is what proves it: 3.38 s that is nothing but a 993 Hz tone, taken to -33 dB in the archive and
 handed back at -11 LUFS by both of them. The spans are recorded in the *original's* timebase, so `head_trim_s`
 comes off them wherever the processed copy is the source.
 
 **No-speech calls (`audio_meta.content`).** `audio_silent_below_db` asks how loud the whole clip is, and a mic
-key-up answers "loud enough": production calls 2395971/2395972 are 0.35 s at -80 dBFS and then one 30 ms click
+key-up answers "loud enough": one measured key-up (recorded twice) is 0.35 s at -80 dBFS and then one 30 ms click
 at -22 dBFS, peaking at -9 — a whole-clip mean of about -50 dBFS, comfortably past the -60 silent floor, with
 nobody having said a word. The question that separates them is not how loud the clip is but **how much of it
 is**, so the pass also measures the *seconds above a floor* on the processed copy — after the trim, the gain and
 the tone handling, so the floor means the same thing for a quiet talker as for a loud one. `silencedetect` at
 `audio_speech_floor_db` (-40 dBFS) reports the quiet stretches, and what is left — **less the tone spans**, because
 a page or a console tone is loud and is not somebody talking — is `audio_meta.speech_s`. That exclusion is what
-makes call 2396243, 2.0 s of 993 Hz and nothing else, a no-speech call rather than two seconds of "speech". Under
+makes a tone-only call, 2.0 s of 993 Hz and nothing else, a no-speech call rather than two seconds of "speech". Under
 `audio_min_speech_seconds` (0.25 s) the call is `audio_meta.content = "none"`; otherwise `"speech"`.
 
-**Except static, which that measure cannot see at all.** Production calls 2403008, 2402904 and 2402672 are
+**Except static, which that measure cannot see at all.** Three measured static calls are
 broadband vocoder noise across the whole 300-3400 Hz band — a squelch tail or a failed decode, not a quiet
 talker — and all three were stored `"speech"` with 0.4-1.3 s of "speech" in them, because `speech_seconds`
 counts loud seconds on the **processed** copy and the gain stage had just lifted them 24-30 dB clear of the
-floor. 2402672 measured 1.306 s of speech in a 1.584 s clip whose frame-level dynamic range is 4.94 dB.
+floor. One of them measured 1.306 s of speech in a 1.584 s clip whose frame-level dynamic range is 4.94 dB.
 What separates them is **in-band spectral flatness** — the geometric mean of a frame's power spectrum over its
 arithmetic mean, 1.0 for white noise and near zero for a vowel, which puts its energy in formants and leaves
 nulls between them. A call is `content = "static"` when
@@ -1176,15 +1176,15 @@ nulls between them. A call is `content = "static"` when
 > is at least `audio_static_frame_share` (0.70) **and** the trimmed mean is at or under -35 dBFS.
 
 Measured: 3 of 3 static calls flagged (flat share 0.82/0.90/0.93), **0 of 36** others — the twelve quietest
-real calls in the archive measure 0.02-0.20, and the nearest miss is 2402676 at 0.70 but -26.5 dBFS. The
-**level term is the one carrying the rule**: `speechish` broadband speech and production 2405803/2405804 (the
+real calls in the archive measure 0.02-0.20, and the nearest miss measures 0.70 but -26.5 dBFS. The
+**level term is the one carrying the rule**: `speechish` broadband speech and one quiet pair (the
 same transmission recorded twice) measure 0.74-1.00 flat and are excluded on level alone, leaving the flatness
 axis only about 0.05 of margin. The share is stored per call as `audio_meta.flat_frac` so the rule can be
 audited against the archive rather than argued about.
 
 It is measured on the **recorder's own file**, not the processed copy, and that is not a detail: on the
 processed copy the three static calls come off the chain at -28.1 to -29.0 dBFS, above the level term, so the
-rule flags **none** of them — while a genuinely quiet call (2405911) rises to 0.72 flat and starts to look like
+rule flags **none** of them — while a genuinely quiet call rises to 0.72 flat and starts to look like
 one. The raw decode is also the one the trim measurement already has in hand, so this costs an FFT over a
 couple of seconds and no extra decode.
 
@@ -1195,7 +1195,7 @@ an RF fault. It is counted apart as `static_24h` on `/api/stats/overview`, and t
 skip reasons say `static` rather than `no speech`.
 
 **Except a page.** A `two_tone`, `warble` or `alert` pattern makes the call `"page"` whatever the speech seconds
-say: production calls 2396355 and 2396357 are 4.25 s fire dispatch tone-outs — an A tone of about a second, a B
+say: two measured fire dispatch tone-outs are 4.25 s each — an A tone of about a second, a B
 tone of about 2.75, and not one word — so by speech alone they are indistinguishable from a mic click, and the
 discard pass would have taken the most important audio on the system. A lone `single` is deliberately *not* a
 page: that is the console's attention tone, which is why the test is the span's pattern rather than "a tone was

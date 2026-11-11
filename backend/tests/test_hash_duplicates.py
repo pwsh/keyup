@@ -3,9 +3,9 @@
 Reconciliation's exact rung read an identical ``sha256`` as proof of the same transmission
 whatever the time.  Identical bytes only prove the same *recording*: a short recording with
 no voice in it — a squelch tail, 0.14-2 s — encodes to byte-identical MP3 bytes every time,
-so one hash spreads across hundreds of unrelated calls.  Production ruled call 2250773 (a
-1.7 s unit call on 2026-09-08) a duplicate of call 8371 (a 1.7 s group call on talkgroup 2
-from 2026-08-31); 927 rows, one hash covering 155 of them.
+so one hash spreads across hundreds of unrelated calls.  A 1.7 s unit call was ruled a
+duplicate of a 1.7 s group call on another talkgroup a week earlier; hundreds of rows, one
+hash covering over a hundred of them.
 
 The first three tests are the rung; the rest are the repair that frees the rows already
 written.

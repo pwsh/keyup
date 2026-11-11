@@ -5,7 +5,7 @@ docs/ARCHITECTURE.md §5.2 ("Automatic recovery from a backend outage").
 The unpark pass (b6e1c30d94af) requeues a job parked as ``backend_unavailable`` once a
 backend is healthy again, and resets ``attempts`` to zero when it does.  That is right for
 an outage and a loop for a recording every backend times out on while serving everybody
-else: on 2026-09-23 call 5237413 was parked and requeued like that for two hours, holding a
+else: one looping BOLO call was parked and requeued like that for two hours, holding a
 slot on all three Whisper servers each round, until an operator parked it by hand.
 
 The worker now tells the two apart, and this counter is the backstop for when it cannot:

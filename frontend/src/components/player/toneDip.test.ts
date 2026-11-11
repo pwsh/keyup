@@ -5,7 +5,7 @@ import { TONE_DEPTH_DB, toneGainPoints } from "./normalize";
  * The arithmetic behind the player's tone dip.
  *
  * Normalize's compressor and its 18 dB of make-up gain undo what the server's §5.5 pass
- * did: production call 2396243 is a 2 s console attention tone the pass took down to about
+ * did: the tone-only call is a 2 s console attention tone the pass took down to about
  * -33 dB in the stored file, and a call whose only loud thing is that tone comes back out
  * of the compressor at full blast. The dip is scheduled on a gain node of its own, and this
  * is the pure half — where the points land and how deep they go.

@@ -1,8 +1,8 @@
 """Put the backlog's calls back on the day they were recorded.
 
 The sibling of :mod:`app.repair`: an operator command, run by hand, that cleans up after a
-bug the archive already swallowed.  This one repairs **1,041,258 backlog uploads stamped
-with the day they were uploaded** — the whole pre-2025 sdrtrunk archive — and everything
+bug the archive already swallowed.  This one repairs **backlog uploads stamped with the
+day they were uploaded** — a whole pre-2025 sdrtrunk archive, a million calls on a large one — and everything
 that decision then poisoned.
 
 What happened (docs/MIGRATION.md, "Timestamps")
@@ -21,8 +21,8 @@ backlog was therefore stored on the upload date, seconds apart, with
 Three things follow from that, and this module undoes all three:
 
 * the **times** are wrong — a million calls on one day;
-* **reconciliation** compared those times and matched 911,778 of them against each other,
-  so 86 % of the archive is hidden behind a ``duplicate_of`` pointing at an unrelated
+* **reconciliation** compared those times and matched most of them against each other,
+  so most of the archive is hidden behind a ``duplicate_of`` pointing at an unrelated
   transmission;
 * **conversations** were grouped by talkgroup and time gap over the same fiction.
 

@@ -1,8 +1,8 @@
 """Live end-to-end test against a real OpenVINO Model Server.
 
 Skipped unless ``STT_LIVE_OVMS=1``.  Any device works — the server decides that, not us — so
-this runs against a CPU container on a laptop and against the iGPU/NPU container on the
-production host unchanged::
+this runs against a CPU container on a laptop and against the iGPU/NPU container on an
+Intel Core Ultra host unchanged::
 
     docker run --rm -p 127.0.0.1:8097:8000 -v /tmp/ovms-models:/models:rw \\
         openvino/model_server:weekly --rest_port 8000 \\

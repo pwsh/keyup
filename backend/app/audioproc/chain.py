@@ -348,7 +348,7 @@ def gate_threshold_db(measurement: Measurement, config: AudioConfig) -> float:
 
     ``audio_gate_db`` alone is a threshold in absolute dBFS applied *before* the gain, and
     that is only the right number for a clip that arrived at a normal level.  Production
-    call 2402904 measures -46.28 dBFS whole-clip: the -50 dB default therefore sat 3.7 dB
+    one static call measures -46.28 dBFS whole-clip: the -50 dB default therefore sat 3.7 dB
     under the **content**, so a 4:1 downward ratio was applied to the speech itself and the
     ``volume=30dB`` the chain asked for came out as 19 dB.  Eighteen of the eighteen calls
     more than 6 dB below the archive's median level are on this branch, and none is a
@@ -394,7 +394,7 @@ def _tone_stage(
     **How far a span comes down depends on what it is.**  A two-tone page, a warble or a
     repeated alert is the *message*: somebody was toned out, and a listener wants to hear it
     under the dispatch that follows, so it gets ``page_tone_attenuate_db`` (18 dB — quieter,
-    still plainly there).  A ``single`` is the console's held attention tone — call 2396065 is
+    still plainly there).  A ``single`` is the console's held attention tone — the attention-tone call is
     1.95 s of 993 Hz at -10.5 dB in front of 17 s of speech — which carries nothing at all
     and is simply loud, so it gets the deeper ``tone_attenuate_db``.
     """
@@ -476,7 +476,7 @@ def tone_envelope(
     The stored chain builds this once, inside :func:`_tone_stage`.  The **export** chain has
     to build it a second time (:func:`app.exporters.loudness.export_filter`): its loudness
     stage measures the processed file, sees a call that is nothing but an attenuated tone,
-    and lifts the tone straight back to the export target — production call 2396243 left for
+    and lifts the tone straight back to the export target — the tone-only call left for
     OpenMHz at -11 LUFS with the 993 Hz tone we had just taken down to -33 dB.  Re-applying
     the same envelope *after* the loudness stage is what stops an export ever being louder in
     a tone span than the file it came from.

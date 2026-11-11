@@ -302,7 +302,7 @@ def test_health_reports_http_error():
 def test_a_read_timeout_is_not_retried_on_the_same_server(mp3):
     """The server took the upload and used the whole deadline on it; it would do so again.
 
-    Call 5237413 (2026-09-23) held a slot for 3 x 120 s on each server, every round.
+    The looping BOLO call held a slot for 3 x 120 s on each server, every round.
     """
     from app.stt.base import RequestTimeoutError
 

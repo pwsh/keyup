@@ -188,7 +188,7 @@ def test_a_call_with_no_speech_in_it_never_reaches_whisper(session, worker, tmp_
     Transcription is enqueued by ingest; the audio pass runs on its own queue and is what
     measures whether anybody spoke (``audio_meta.content``, §5.5).  So the job usually exists
     *before* the verdict does, and the only place that can act on it is the moment the job is
-    claimed.  Production 2395971/2395972 — 0.648 s, one click, no words — were both sent to
+    claimed.  The key-up pair — 0.648 s, one click, no words — were both sent to
     Whisper and both came back empty.
     """
     call, job = seed_call(session, root=tmp_path)
@@ -228,7 +228,7 @@ def test_a_call_with_speech_is_claimed(session, worker, tmp_path) -> None:  # no
 def test_a_page_is_claimed_even_though_nobody_spoke(session, worker, tmp_path) -> None:  # noqa: ANN001
     """Only `none` skips.
 
-    Calls 2396355/2396357 are 4.25 s of pager tone-out with no dispatch behind them: no
+    The tone-out pair are 4.25 s of pager tone-out with no dispatch behind them: no
     speech at all, and still content.  Whisper will make little of it, which is fine — the
     empty result is a fact about the call and not a job we should never have run.
     """
@@ -1603,7 +1603,7 @@ def test_the_thirty_second_thank_you_is_still_discarded(session, worker, tmp_pat
 
 
 # --------------------------------------------------------------------------------------
-# a recording every backend chokes on is not an outage (call 5237413, 2026-09-23)
+# a recording every backend chokes on is not an outage (the looping BOLO call)
 # --------------------------------------------------------------------------------------
 #
 # These run the real router over real OpenAI-compatible clients, with respx standing in
@@ -1844,7 +1844,7 @@ def test_the_request_deadline_scales_with_the_clip(session, worker, tmp_path) ->
 def test_the_retry_after_a_poison_failure_goes_without_the_prompt_and_can_succeed(
     session, worker, tmp_path  # noqa: ANN001
 ) -> None:
-    """What call 5237413 does on Whisper: loops with the prompt, transcribes without it."""
+    """What the looping BOLO call does on Whisper: loops with the prompt, transcribes without it."""
     import httpx
     import respx
 

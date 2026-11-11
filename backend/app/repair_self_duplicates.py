@@ -15,9 +15,9 @@ retransmitting a file), a pass over ``A`` found ``B``, resolved it back to ``A``
 identically, a tie leaves the *existing* primary in place, and the tie's loser is the
 newcomer — the same row — so the write was ``A.duplicate_of = A.id``.
 
-Production carries **18,708** such rows: ``reconcile_reason.rule = 'tie'``, ``match.rule =
-'identical sha256'``, a ``scores`` dict with a single call id in it.  Roughly 2,000 live
-calls a day since 2026-09-03, and every 2022 backlog recording.  Each one is invisible:
+A large archive carried **tens of thousands** of such rows: ``reconcile_reason.rule = 'tie'``, ``match.rule =
+'identical sha256'``, a ``scores`` dict with a single call id in it.  Live calls every
+day, and every migrated backlog recording.  Each one is invisible:
 every API listing filters on ``duplicate_of IS NULL``, the row was taken out of its
 conversation, and a transcript that was pending or queued was set to ``skipped`` with its
 jobs cancelled.  The call is not lost — the bytes, the metadata and any finished transcript

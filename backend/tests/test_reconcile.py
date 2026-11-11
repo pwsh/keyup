@@ -208,7 +208,7 @@ def _short(start_offset: float, duration: float, radio: int | None = None) -> In
 
 
 class TestTheShortCallRung:
-    """Two whole-second stamps of one sub-second key-up (production 2395971/2395972).
+    """Two whole-second stamps of one sub-second key-up (the key-up pair).
 
     Radio 2087 keyed TRANSIT for 0.648 s and both recorders heard it.  Each reported its call
     start in whole unix seconds, so one landed on 04:59:32 and the other on 04:59:33 — two

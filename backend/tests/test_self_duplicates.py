@@ -3,7 +3,7 @@
 Reconciliation's exact-hash rung applied its exclusion list to the row it *found* and not
 to the primary that row resolves to, so a call whose bytes were stored twice matched its
 own copy, followed it home, tied with itself, and was written ``duplicate_of = <its own
-id>``.  18,708 rows on production, every one hidden from every listing.  The first two
+id>``.  Tens of thousands of rows on a large archive, every one hidden from every listing.  The first two
 tests here are the bug; the rest are the repair that frees the rows already written.
 """
 

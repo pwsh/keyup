@@ -489,7 +489,7 @@ def served_others(router: BackendRouter, *backends: FakeBackend, tmp_path) -> No
 
 
 def test_every_serving_backend_timing_out_on_one_file_is_not_an_outage(tmp_path):
-    """Call 5237413: three servers, each busily transcribing others, each timing out on it."""
+    """The looping BOLO call: three servers, each busily transcribing others, each timing out on it."""
     backends = [FakeBackend(n, priority=p) for n, p in (("p0", 10), ("p1", 11), ("p2", 12))]
     router = BackendRouter(backends)
     served_others(router, *backends, tmp_path=tmp_path)

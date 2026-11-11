@@ -48,13 +48,13 @@ It does **not** send ``dateTime`` unless asked (``--send-datetime``), which make
 server's reading of ``audioName`` the *only* source of the call's time — so a name Keyup's
 parser cannot read has no time at all.  The endpoint refuses such a push at ``backlog``
 priority (400, ``{"error": "no_call_time"}``) rather than filing the call under the moment
-it arrived; that is deliberate, and it is the guard on the failure this run already had
-once, when a parser that rejected every pre-2025 filename put 1,041,258 calls on their
+it arrived; that is deliberate, and it is the guard on a failure an older Keyup
+had, when a parser that rejected every pre-2025 filename put a million calls on their
 upload date (docs/MIGRATION.md, "Timestamps").  A refusal is counted as failed, stays out
 of the ledger's done set, and is re-sent by the next run — so the fix is to deploy the
 parser (or pass ``--send-datetime``) and start the tool again.  Whether an sdrtrunk
 filename stamp is the call's *start* or the instant the finished file was *closed* (its end)
-is being measured against the production recorder; until that lands, the server's own
+was an open question when this was written; until it is settled, the server's own
 reading of the ID3 ``Date`` frame plus the duration it measures places the call correctly
 and this client stays out of it.  When it lands, it is one flag either way:
 ``--send-datetime`` alone if the stamp is the start, ``--datetime-is-end`` as well if it is
