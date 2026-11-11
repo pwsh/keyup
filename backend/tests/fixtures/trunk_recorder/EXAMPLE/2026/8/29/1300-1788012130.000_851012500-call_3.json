@@ -1,0 +1,51 @@
+{
+  "freq": 851012500,
+  "freq_error": 0,
+  "signal": -60,
+  "noise": -101,
+  "source_num": 0,
+  "recorder_num": 2,
+  "tdma_slot": 1,
+  "phase2_tdma": 1,
+  "start_time": 1788012130,
+  "stop_time": 1788012137,
+  "start_time_ms": 1788012130000,
+  "stop_time_ms": 1788012137000,
+  "emergency": 0,
+  "priority": 0,
+  "mode": "P25 Phase 2",
+  "duplex": 0,
+  "encrypted": 1,
+  "call_length": 7,
+  "call_length_ms": 7000,
+  "talkgroup": 1300,
+  "talkgroup_tag": "Law Tac",
+  "talkgroup_description": "Narcotics task force, encrypted",
+  "talkgroup_group_tag": "EX TF TAC",
+  "talkgroup_group": "Example County",
+  "color_code": 0,
+  "audio_type": "digital tdma",
+  "short_name": "EXAMPLE",
+  "call_num": 3,
+  "freqList": [
+    {
+      "freq": 851012500,
+      "time": 1788012130,
+      "pos": 0.0,
+      "len": 7.0,
+      "error_count": 0,
+      "spike_count": 0
+    }
+  ],
+  "srcList": [
+    {
+      "src": 5259001,
+      "time": 1788012130,
+      "pos": 0.0,
+      "emergency": 0,
+      "signal_system": "",
+      "tag": "",
+      "tag_ota": ""
+    }
+  ]
+}

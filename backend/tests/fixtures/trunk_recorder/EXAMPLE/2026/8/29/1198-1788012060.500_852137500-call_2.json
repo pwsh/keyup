@@ -1,0 +1,55 @@
+{
+  "freq": 852137500,
+  "freq_error": 5,
+  "signal": -51,
+  "noise": -99,
+  "source_num": 0,
+  "recorder_num": 1,
+  "tdma_slot": 0,
+  "phase2_tdma": 0,
+  "start_time": 1788012060,
+  "stop_time": 1788012064,
+  "start_time_ms": 1788012060500,
+  "stop_time_ms": 1788012064500,
+  "emergency": 1,
+  "priority": 0,
+  "mode": "P25 Phase 1",
+  "duplex": 0,
+  "encrypted": 0,
+  "call_length": 4,
+  "call_length_ms": 4000,
+  "talkgroup": 1198,
+  "talkgroup_tag": "Interop",
+  "talkgroup_description": "County-wide interop patch",
+  "talkgroup_group_tag": "EX INTEROP",
+  "talkgroup_group": "Interoperability",
+  "color_code": 0,
+  "audio_type": "digital tdma",
+  "short_name": "EXAMPLE",
+  "call_num": 2,
+  "patched_talkgroups": [
+    1701,
+    1400
+  ],
+  "freqList": [
+    {
+      "freq": 852137500,
+      "time": 1788012060,
+      "pos": 0.0,
+      "len": 4.0,
+      "error_count": 0,
+      "spike_count": 1
+    }
+  ],
+  "srcList": [
+    {
+      "src": 5250057,
+      "time": 1788012060,
+      "pos": 0.0,
+      "emergency": 1,
+      "signal_system": "",
+      "tag": "UNIT 41",
+      "tag_ota": ""
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# Example talkgroup classification rules for `keyup classify-talkgroups --rules FILE`.
+#
+# Copy this file, rewrite it for your own system's aliases, and run
+#   keyup classify-talkgroups --rules my-rules.csv --system "My System"           # dry run
+#   keyup classify-talkgroups --rules my-rules.csv --system "My System" --apply   # write it
+# The rules walk in order and the first `pattern` that matches a talkgroup's alias wins;
+# a talkgroup no pattern matches is left exactly as it is.  Fill-only: a value someone
+# already set is kept unless you pass --overwrite.
+#
+# pattern      case-insensitive Python regex, *searched* (not anchored) against the alias
+# category     one of the talkgroup categories (GET /api/directory/vocabulary)
+# service_tag  RadioReference's own spelling (same list), or blank
+# agency_code  a code from your agency list (keyup seed-agencies; here the codes of
+#              examples/agencies.example.csv), or blank for a shared channel no single
+#              agency owns — a deliberate answer, not a gap
+# note         why, for whoever reads this file next
+#
+pattern,category,service_tag,agency_code,note
+# ---- law ---------------------------------------------------------------------------
+\bCCPD\b.*\bDISPATCH\b,law,Law Dispatch,EXAMPLEPD,Central City PD's own dispatch channel
+\bCCPD\b,law,Law Tac,EXAMPLEPD,Central City PD car-to-car
+\bLAW\s*[1-3]\b,law,Law Dispatch,,county law dispatch 1-3: every agency's
+# ---- fire --------------------------------------------------------------------------
+\bCCFD\b,fire,Fire-Tac,EXAMPLEFD,Central City Fire tactical
+\bFIRE\s*DISPATCH\b,fire,Fire Dispatch,,county fire dispatch: every department's
+\bF\s*-?\s*TAC\s*[1-3]\b,fire,Fire-Tac,,fireground tactical 1-3
+# ---- ems and everything else -------------------------------------------------------
+\bEMS\s*TAC\b,ems,EMS-Tac,,EMS tactical
+"\bEVENT\s*(?:1|2|3|4)\b",multi,Multi-Tac,,shared event channels 1-4
+\bPUBLIC\s*WORKS\b,pw,Public Works,,municipal public works

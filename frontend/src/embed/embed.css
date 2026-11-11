@@ -1,0 +1,320 @@
+/*
+ * The embed's whole stylesheet. Plain CSS on purpose: the app's Tailwind build would ship
+ * every utility the app uses to a page that needs forty rules. The palette is the app's
+ * own (src/index.css), so an embed next to a Keyup tab looks like the same product.
+ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f1f0ec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --line: #e1e0d9;
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --line: #2c2c2a;
+    --accent: #3987e5;
+    --accent-ink: #a8ccf5;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --line: #2c2c2a;
+  --accent: #3987e5;
+  --accent-ink: #a8ccf5;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.kt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.kt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.kt-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.kt-dot-live {
+  background: var(--good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent);
+}
+.kt-dot-error {
+  background: var(--critical);
+}
+.kt-state {
+  font-weight: 600;
+  color: var(--ink);
+}
+.kt-caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.kt-select,
+.kt-input {
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 8px;
+}
+.kt-input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.kt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.kt-chip button {
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.kt-pill {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  z-index: 2;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 14px;
+  padding: 4px 12px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+
+.kt-empty {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.kt-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent-ink);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kt-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overflow-anchor: none;
+}
+
+.kt-row {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+/* Where the day changes going down the list: older pages can reach back days or months. */
+.kt-day {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--page);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+/* The end of the list: the next page loads as this comes into view (or on a click). */
+.kt-end {
+  padding: 12px;
+  color: var(--ink-2);
+  font-size: 12px;
+  text-align: center;
+}
+.kt-end .kt-link:disabled {
+  color: var(--ink-2);
+  text-decoration: none;
+  cursor: default;
+}
+.kt-fresh {
+  animation: kt-in 0.45s ease-out;
+}
+@keyframes kt-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kt-fresh {
+    animation: none;
+  }
+}
+
+.kt-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+  min-width: 0;
+}
+.kt-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.kt-tg {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.kt-dur {
+  font-variant-numeric: tabular-nums;
+}
+.kt-open {
+  margin-left: auto;
+  flex: none;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.kt-open:hover,
+.kt-open:focus-visible {
+  text-decoration: underline;
+}
+.kt-text {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.kt-pending {
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.kt-compact .kt-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 10px;
+}
+.kt-compact .kt-meta {
+  flex: none;
+  max-width: 45%;
+}
+.kt-compact .kt-open {
+  order: 9;
+}
+.kt-compact .kt-text {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.kt-compact .kt-dur {
+  display: none;
+}
+
+/* Read by screen readers, not shown: the embed's page heading. */
+.kt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

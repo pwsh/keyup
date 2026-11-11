@@ -1,0 +1,12 @@
+{
+  "feeds": [
+    {
+      "feed_id": "2211",
+      "description": "Example County Fire and EMS",
+      "category": "Fire-EMS",
+      "online": "true",
+      "listeners": "12",
+      "max_listeners": 212
+    }
+  ]
+}

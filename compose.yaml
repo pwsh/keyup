@@ -1,0 +1,519 @@
+name: keyup
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-keyup}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-keyup}
+      POSTGRES_DB: ${POSTGRES_DB:-keyup}
+    # Parallel query workers hand each other results through POSIX shared memory in
+    # /dev/shm, and Docker's default is 64 MB: the transcription stats query needed
+    # 16 MB segments x 3 workers and answered 'could not resize shared memory
+    # segment ... No space left on device'.  It is tmpfs, so it costs nothing until used —
+    # but it is not unlimited either: 1 GB was exhausted again by ~30 full-text searches at
+    # once (each with its own parallel workers), which is why searches now queue for a few
+    # slots and run with one worker each (backend/app/api/search_load.py).  Size it with
+    # the PG_* block in .env.example; the default suits a small host.
+    shm_size: "${PG_SHM_SIZE:-256m}"
+    # Postgres tuning, in the repo rather than in the data volume (ALTER SYSTEM writes
+    # postgresql.auto.conf *inside* dbdata: invisible here and lost with the volume;
+    # command-line `-c` outranks it).  The memory sizes depend on the host, so they come
+    # from PG_* variables whose defaults suit a ~4 GB host; .env.example has a table for
+    # bigger ones (docs/OPERATIONS.md).
+    #
+    #   shared_buffers / effective_cache_size  the usual ~25% / ~60% of the RAM Postgres
+    #     can count on, after the rest of the stack (and any STT container) has its share.
+    #   work_mem          per sort or hash, per query node: too small spills to temp files
+    #     (log_temp_files below names them), too large multiplies by every concurrent
+    #     query.  Parallel hash joins also take their buckets from /dev/shm above.
+    #   random_page_cost 1.1  the archive is on SSD.  The shipped 4 is a spinning-disk
+    #     number and it is what makes the planner prefer a sequential scan over an index it
+    #     should have used — the likeliest single cause of the 83% cache hit rate.
+    #   effective_io_concurrency 200  likewise: 16 is the conservative default, an SSD will
+    #     take far more concurrent prefetches on a bitmap heap scan.
+    #   log_temp_files 10MB   names the queries still spilling, so the next pass at this has
+    #     evidence instead of a total.
+    #   pg_stat_statements  the extension itself is created by migration c4e91f3b57a8, which
+    #     tolerates this library being absent; `track=all` counts statements inside
+    #     functions too.
+    #
+    # Changing this line RECREATES the db container — a few seconds of outage.  Recorders
+    # spool and retry, so do it when the transcription queue is low (docs/OPERATIONS.md).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${PG_SHARED_BUFFERS:-512MB}
+      - -c
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-2GB}
+      - -c
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-128MB}
+      - -c
+      - max_wal_size=${PG_MAX_WAL_SIZE:-1GB}
+      - -c
+      - work_mem=${PG_WORK_MEM:-16MB}
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - log_temp_files=10MB
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+    volumes:
+      - dbdata:/var/lib/postgresql
+    ports:
+      # Bound to the loopback on purpose: the API and the worker reach Postgres over
+      # the compose network, and the published port is only for psql on this host.  The
+      # unqualified form listens on every interface, which put the archive's database on
+      # the LAN behind nothing but its password.
+      - "127.0.0.1:${DB_PORT:-55440}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-keyup} -d ${POSTGRES_DB:-keyup}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # One-shot: the schema migration and the agency seed, then it exits.  It used to be the
+  # first half of the api's start command, which meant the api was down (uploads refused,
+  # recorders spooling) for the whole migration and every api restart re-ran it.  Now
+  # scripts/update.sh runs this on its own *before* `up`, while the old api is still serving, and
+  # the api below will not start until it has exited 0 — so a failed migration stops the
+  # rollout instead of starting new code against the old schema.  `alembic upgrade head` on
+  # an up-to-date database is a no-op, so the second run inside `up` costs a few seconds.
+  # Same image as api and worker; `build` lives on api only, so compose builds it once.
+  migrate:
+    image: keyup-backend:latest
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-keyup}:${POSTGRES_PASSWORD:-keyup}@db:5432/${POSTGRES_DB:-keyup}
+      # The zone the recorders' naive timestamps are in (.env.example TZ); UTC unless set.
+      TZ: ${TZ:-UTC}
+    # The site profile: the agency CSV that `keyup seed-agencies` loads when
+    # KEYUP_SEED_AGENCIES names it (e.g. /site/agencies.csv).  Unset, the seed step is a
+    # no-op; examples/ shows the format.
+    volumes:
+      - ${KEYUP_SITE_DIR:-./examples}:/site:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "alembic upgrade head && keyup seed-agencies --if-configured"]
+    restart: "no"
+
+  api:
+    build: ./backend
+    # The one backend image: api builds it, migrate and worker run it by this name.
+    image: keyup-backend:latest
+    env_file:
+      # Optional: compose works from the defaults below without a .env file.
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-keyup}:${POSTGRES_PASSWORD:-keyup}@db:5432/${POSTGRES_DB:-keyup}
+      # The zone the recorders' naive timestamps are in (.env.example TZ); UTC unless set.
+      TZ: ${TZ:-UTC}
+      # Proxies in front of the API whose X-Forwarded-For entries are believed: the stock
+      # chain is edge (Caddy) -> web (nginx) -> api, so 2.  Set 0 if nothing proxies it.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-2}
+      AUDIO_ROOT: /srv/keyup/audio
+      EXPORT_DIR: /srv/keyup/exports
+      WAVEFORM_CACHE_DIR: /srv/keyup/cache/waveform
+      EVENT_LOG_ROOT: /srv/keyup/eventlogs
+    volumes:
+      # The API only ever reads recordings (range requests, waveforms, exports).
+      # Read-write since the push path (POST /api/call-upload) stores each call under
+      # AUDIO_ROOT/uploads/, which must be writable by the app uid 10001
+      # (scripts/bootstrap.sh creates it so).
+      - ${AUDIO_ROOT:-./audio}:/srv/keyup/audio
+      # …but it *writes* the export bundles it builds and the waveform peak cache, and
+      # both used to live inside the container, so a restart threw them away.
+      - ${EXPORT_DIR:-./exports}:/srv/keyup/exports
+      - ${WAVEFORM_CACHE_DIR:-./cache/waveform}:/srv/keyup/cache/waveform
+      # The archived recorder event logs (POST /api/recorder/event-log). A bind of its own
+      # rather than a directory inside AUDIO_ROOT: the ingest walk scans the audio tree and
+      # retention purges from it, and neither should ever meet a .jsonl.gz. Without this
+      # line the days would be written inside the container and thrown away on restart —
+      # the same mistake the exports and the waveform cache were fixed for.
+      - ${EVENT_LOG_ROOT:-./eventlogs}:/srv/keyup/eventlogs
+    ports:
+      - "127.0.0.1:${API_PORT:-8096}:8000"   # host-local only: the LAN reaches the API through the edge, and a LAN client here would sit behind the bridge gateway, which uvicorn trusts for forwarded headers
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - 172.16.0.0/12
+    healthcheck:
+      # /api/healthz, not /api/status: the health probe should answer "is this process
+      # serving" without the database work /api/status does to build a dashboard payload —
+      # a slow status query used to fail the healthcheck and take the worker down with it,
+      # since the worker's `depends_on` waits for api to be healthy.
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      # Probe every 2 s while starting instead of waiting a full interval for the first
+      # probe: the worker waits on this, and the api is up in a few seconds
+      # now that the migration is not in its start command.
+      start_period: 60s
+      start_interval: 2s
+    restart: unless-stopped
+
+  worker:
+    # Built by `api` (same Dockerfile, same context): one build, one image per deploy.
+    image: keyup-backend:latest
+    env_file:
+      # Optional: compose works from the defaults below without a .env file.
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-keyup}:${POSTGRES_PASSWORD:-keyup}@db:5432/${POSTGRES_DB:-keyup}
+      # The zone the recorders' naive timestamps are in (.env.example TZ); UTC unless set.
+      TZ: ${TZ:-UTC}
+      # Proxies in front of the API whose X-Forwarded-For entries are believed: the stock
+      # chain is edge (Caddy) -> web (nginx) -> api, so 2.  Set 0 if nothing proxies it.
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-2}
+      AUDIO_ROOT: /srv/keyup/audio
+      EXPORT_DIR: /srv/keyup/exports
+      BACKUP_DIR: /srv/keyup/backups/db
+    volumes:
+      # Read-write: retention purges or archives audio on the nightly pass, and the
+      # audio-processing stage writes each call's `.proc.mp3` beside the original (§5.5).
+      - ${AUDIO_ROOT:-./audio}:/srv/keyup/audio
+      # …and the nightly export vacuum deletes bundles the API wrote.
+      - ${EXPORT_DIR:-./exports}:/srv/keyup/exports
+      # Read-only: the health check's "backup overdue" looks at the newest manifest
+      # deploy/backup/keyup-db-backup.sh wrote (app/health.py, docs/OPERATIONS.md §7).
+      # Compose creates the host directory if it is missing; an empty one reads as "no
+      # backup yet", which is true.
+      - ${BACKUP_DIR:-./backups/db}:/srv/keyup/backups/db:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    # Ingest, transcription, alerts and the nightly maintenance jobs in one process.
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+
+  # nginx serving the built SPA and proxying /api (including the live WebSocket, the
+  # ranged audio and the streamed exports) to the api service, so the browser only
+  # ever talks to one origin — which is what makes the session cookie and the API's
+  # same-origin check work without any CORS allowance in production.
+  web:
+    build:
+      context: ./frontend
+      # A release serves the real archive. `VITE_MOCK=1` here — and only here —
+      # would build an image carrying the sample corpus instead.
+      args:
+        VITE_MOCK: "${VITE_MOCK:-0}"
+        VITE_GTM_CONTAINER_ID: "${VITE_GTM_CONTAINER_ID:-}"
+        VITE_PRIVACY_CONTACT: "${VITE_PRIVACY_CONTACT:-}"
+        # The public site's identity (.env.example "public site"); blank = no public host
+        # and generic wording.
+        VITE_PUBLIC_HOST: "${VITE_PUBLIC_HOST:-}"
+        VITE_SITE_NAME: "${VITE_SITE_NAME:-}"
+        VITE_SITE_DESCRIPTION: "${VITE_SITE_DESCRIPTION:-}"
+        VITE_SITE_ABOUT: "${VITE_SITE_ABOUT:-}"
+    environment:
+      # Who may put /embed/* in an <iframe>: a CSP frame-ancestors source list, `*` for
+      # any site (docs/EMBED.md). Everything else is framable by Keyup itself only.
+      EMBED_FRAME_ANCESTORS: "${EMBED_FRAME_ANCESTORS:-*}"
+      # The one hostname search engines may index (nginx.conf's X-Robots-Tag map): the same
+      # value the frontend was built with, so the page and its headers agree.
+      PUBLIC_HOST: "${VITE_PUBLIC_HOST:-}"
+    # No published port: `edge` is what listens on WEB_PORT now and reaches this over the
+    # compose network as keyup-web:80.  Publishing it as well would put a second, unencrypted
+    # front door on the LAN that skips the redirect and the certificate entirely.
+    networks:
+      default:
+        aliases:
+          # The name the edge proxies to (backend/app/edge/render.py UPSTREAM), never the
+          # bare service name: while this container is being recreated Docker's DNS forwards
+          # `web` to the LAN resolver, `.web` is a real TLD answering 127.0.53.53 - loopback
+          # inside the edge - and Caddy proxied to itself thousands of times a request
+          # A hyphenated label can never be a public TLD, so `keyup-web.` fails
+          # closed: one 502, one log line.
+          - keyup-web
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  # Caddy in front of nginx: the only listener on the host's web ports.  It exists for one
+  # reason — Let's Encrypt certificates, issued either through HTTP-01 (public names, inbound
+  # 80/443) or through DNS-01 against Cloudflare (LAN-only names, no inbound port at all);
+  # KEYUP_TLS_CHALLENGE picks, docs/HTTPS.md.
+  #
+  # With KEYUP_TLS_DOMAINS blank it is a plain HTTP pass-through and the stack behaves
+  # exactly as it did before this service existed, which is how a fresh clone starts.
+  edge:
+    build: ./deploy/edge
+    env_file:
+      # KEYUP_TLS_DOMAINS, CLOUDFLARE_API_TOKEN, ACME_EMAIL, ACME_CA,
+      # KEYUP_TLS_REDIRECT_HTTP, KEYUP_TLS_CHALLENGE, EDGE_TRUSTED_PROXIES.  These are the *bootstrap*: they decide what the container
+      # starts on, and the API pushes the settings table's version over the admin API a
+      # moment later (docs/HTTPS.md, "Where the configuration comes from").
+      - path: .env
+        required: false
+    ports:
+      # Caddy's admin API listens on :2019 inside the container and is deliberately NOT
+      # published: it is unauthenticated and can replace the whole proxy configuration, so
+      # its only reachable client is another service on this compose network — the `api`
+      # container, which reaches it as edge:2019.  Publishing it would put the archive's
+      # front door on the LAN behind nothing at all.
+      # HTTP-01 certificates (KEYUP_TLS_CHALLENGE=http) need the real ports: WEB_PORT=80 and
+      # WEB_TLS_PORT=443 in .env, reachable from the internet (docs/HTTPS.md).
+      - "${WEB_PORT:-8095}:80"
+      - "${WEB_TLS_PORT:-8443}:443"
+    volumes:
+      # Named volumes, not binds: a checkout can be replaced or re-cloned wholesale, so
+      # anything kept inside the tree would be thrown away — and re-issuing the
+      # certificate on each deploy would walk straight into Let's Encrypt's rate limits.
+      # caddy_data holds the account key and the certificates; caddy_config the autosave.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  # Profile `stt-cpu`: the transcriber a new install starts with — Speaches (faster-whisper
+  # behind the OpenAI Audio API) on this host's CPU.  The default STT_BACKENDS entry
+  # (`whisper`, http://stt-cpu:8000, Systran/faster-whisper-small) points here, and
+  # .env.example turns the profile on with COMPOSE_PROFILES=stt-cpu; an install whose
+  # whisper runs elsewhere leaves the profile out and nothing here is pulled or run.
+  # docs/STT.md §1.  A CUDA variant of this service is in compose.gpu.yaml.
+  #
+  # Speaches answers 404 for a model it has not downloaded, so the command starts the server,
+  # asks it to fetch STT_CPU_MODEL into the `sttcpu` volume (a no-op once it is there) and
+  # the healthcheck passes only when that model is listed — which is the same test the
+  # worker's backend health makes.  STT_CPU_MODEL must equal the `model` of the backend row.
+  #
+  # Sizing: faster-whisper-small at int8 holds about 1 GB of RAM and keeps every core it is
+  # given busy while a call transcribes (a 4 s call took ~3 s on a 6-core desktop); on a small
+  # host set STT_CPU_THREADS so Postgres and ingest keep some.  Larger models are more
+  # accurate and several times slower on a CPU — measure with `python -m app.stt.bench`
+  # before moving up (docs/STT.md).
+  #
+  # No env_file on purpose: this third-party image needs none of .env's secrets.  The image is
+  # pinned by digest (Speaches 0.8.3); move it deliberately, after checking a transcription.
+  stt-cpu:
+    image: ${STT_CPU_IMAGE:-ghcr.io/speaches-ai/speaches:0.8.3-cpu@sha256:21e3df06d842fb7802ab470dd77c25f0e8c0d22950e8d8c6ae886e851af53ef8}
+    profiles: ["stt-cpu"]
+    environment:
+      STT_CPU_MODEL: ${STT_CPU_MODEL:-Systran/faster-whisper-small}
+      # int8 is the fast CPU format; `default` keeps the checkpoint's float16, which a CPU
+      # runs as float32 at about half the speed.
+      WHISPER__COMPUTE_TYPE: ${STT_CPU_COMPUTE_TYPE:-int8}
+      # CPU threads per transcription; 0 = CTranslate2's default.
+      WHISPER__CPU_THREADS: ${STT_CPU_THREADS:-0}
+      # Keep the model loaded: Speaches unloads an idle model after 300 s, and radio traffic
+      # has longer gaps than that, so every quiet spell would cost a reload.
+      WHISPER__TTL: "-1"
+      ENABLE_UI: "false"
+      LOG_LEVEL: info
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        uvicorn --factory speaches.main:create_app & pid=$$!;
+        trap 'kill -TERM $$pid' TERM INT;
+        until curl -sf localhost:8000/health >/dev/null; do
+        kill -0 $$pid 2>/dev/null || exit 1; sleep 1; done;
+        curl -sf -X POST "localhost:8000/v1/models/$$STT_CPU_MODEL" >/dev/null
+        || echo "stt-cpu: could not download $$STT_CPU_MODEL; unhealthy until it is" >&2;
+        wait $$pid; wait $$pid
+    volumes:
+      # The downloaded model.  Losing it costs a re-download on the next start, nothing else.
+      - sttcpu:/home/ubuntu/.cache/huggingface
+    ports:
+      # Loopback only, for `curl localhost:8093/health`; the worker uses stt-cpu:8000.  Not
+      # 8097, which is the stt-ovms-npu default below.
+      - "127.0.0.1:${STT_CPU_PORT:-8093}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models | grep -q \"$$STT_CPU_MODEL\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The first start downloads the model (~500 MB for small); cached in the volume after.
+      start_period: 600s
+      start_interval: 5s
+    restart: unless-stopped
+
+  # Optional profile `stt-openvino`: whisper on the Core Ultra's Arc iGPU or its NPU.
+  # `COMPOSE_PROFILES=stt-openvino docker compose up -d` starts it; without the profile
+  # nothing here is built or run.  It exists as a separate service because the api/worker
+  # image is python:3.12-slim and carries none of the Intel userspace (OpenCL ICD, Level
+  # Zero, the NPU compiler) OpenVINO needs — this image does, and it speaks the same
+  # OpenAI Audio API the worker already knows, so the worker gains an accelerator without
+  # gaining a dependency.  Add the matching STT_BACKENDS entry (kind=openai_compatible,
+  # base_url=http://stt-openvino:8000).  Full walkthrough: docs/STT.md.
+  stt-openvino:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.openvino
+    profiles: ["stt-openvino"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # OpenVINO-format model: a HF repo id or a path under /models.
+      OV_MODEL: ${OV_MODEL:-OpenVINO/whisper-large-v3-turbo-int8-ov}
+      # CPU | GPU | NPU | AUTO.  GPU is the safe default; NPU has model constraints (§NPU
+      # caveats in docs/STT.md).
+      OV_DEVICE: ${OV_DEVICE:-GPU}
+      OV_CPU_THREADS: ${OV_CPU_THREADS:-4}
+      OV_CONCURRENCY: ${OV_CONCURRENCY:-1}
+      OV_CACHE_DIR: /models
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    devices:
+      # The render node is the iGPU; accel0 is the NPU.  A host without an NPU (or a VM or a
+      # container host that was not given the device) must comment the second line out —
+      # compose refuses to start a service whose device node does not exist.
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/accel/accel0:/dev/accel/accel0
+    group_add:
+      # The gid that owns those nodes on the machine that runs this stack (`ls -l /dev/dri
+      # /dev/accel`): the `render` group, often 992, 44, 104 or 109 depending on the distro.
+      - "${RENDER_GID:-992}"
+    volumes:
+      # The downloaded IR model *and* the compiled-blob cache.  Losing this volume costs a
+      # re-download and a fresh GPU/NPU compile on the next start, not correctness.
+      - ovmodels:/models
+    ports:
+      # Loopback only: the worker reaches it over the compose network as stt-openvino:8000.
+      # Published at all so `curl localhost:8098/health` works when the NPU misbehaves.
+      - "127.0.0.1:${STT_OPENVINO_PORT:-8098}:8000"
+    restart: unless-stopped
+
+  # Optional profile `stt-ovms`: Intel's *own* inference server, openvino/model_server, in
+  # front of the same two accelerators.  Two services, one per device, because they are
+  # genuinely different transcribers with different speeds (see the table in
+  # docs/STT.md) and the router should be able to prefer one and fail over to the
+  # other.  `COMPOSE_PROFILES=stt-ovms docker compose up -d` starts both.
+  #
+  # Why this exists next to `stt-openvino`, which also serves whisper on this hardware:
+  # openvino-genai's NPU whisper path throws on every clip on this SKU, and OVMS's does not.
+  # OVMS is therefore the only way to use the NPU at all — at the price of a much thinner
+  # API (no prompt, no hotwords, no VAD, no verbose_json), which is why the worker talks to
+  # it through `kind: ovms` rather than `kind: openai_compatible`.
+  #
+  # Add the matching STT_BACKENDS entries; `model` is the served name, i.e. the *basename*
+  # of OVMS_MODEL (`whisper-large-v3-turbo-fp16-ov`), not the repo id.
+  #
+  # The two services deliberately do NOT share a volume.  OVMS writes a `graph.pbtxt` into
+  # the model directory with `target_device:` baked into it and rewrites it on every start;
+  # two servers on one repository path race for that file, and the loser silently runs on
+  # the other one's device.  Measured, not theorised.
+  #
+  # The image is pinned by digest to the `weekly` build of 2026-08-21, the one measured
+  # working on this platform (docs/STT.md).  `weekly` itself moves every week, and the
+  # release tag `2026.3` is the July build that fails here on both GPU and NPU — so neither
+  # tag alone is a pin.  Move the digest deliberately, after re-running the checks in docs/STT.md.
+  stt-ovms-npu:
+    image: ${OVMS_IMAGE:-openvino/model_server:weekly@sha256:de1d2eed43e2a7c6c8e4802788e13c6c0a47371fe4984f9cce98d0d47c88af41}
+    profiles: ["stt-ovms"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # A pre-converted OpenVINO repo from the `OpenVINO/` HF org.  OVMS downloads it into
+      # the repository path on first start; in-server conversion of a plain transformers
+      # checkpoint does not work on this platform (docs/STT.md).
+      OVMS_MODEL: ${OVMS_MODEL:-OpenVINO/whisper-large-v3-turbo-fp16-ov}
+      OVMS_DEVICE: NPU
+    # bash, not the image's own entrypoint, for one reason: --model_name has to be the
+    # basename of --source_model and compose cannot compute that.  One knob, no drift.
+    # Run as root: the named volume is root-owned and OVMS (uid 5000 in the image) cannot create
+    # /models/.ovms_cache otherwise.  In a rootless or user-namespaced runtime that root is not the host's.
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        exec /ovms/bin/ovms --rest_port 8000
+        --source_model "$$OVMS_MODEL" --model_name "$$(basename "$$OVMS_MODEL")"
+        --model_repository_path /models --cache_dir /models/.ovms_cache
+        --target_device "$$OVMS_DEVICE"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/accel/accel0:/dev/accel/accel0
+    group_add:
+      - "${RENDER_GID:-992}"
+    volumes:
+      # The downloaded model *and* --cache_dir, which is where the compiled blob lands.
+      # OVMS defaults that to /opt/cache **inside the image**, so without pointing it in
+      # here every restart would pay the NPU compile again (up to ~5 min on large-v3-turbo).
+      - ovmsnpu:/models
+    ports:
+      - "127.0.0.1:${STT_OVMS_NPU_PORT:-8097}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models | grep -q \"$$(basename \"$$OVMS_MODEL\")\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # First start downloads the model and compiles it for the NPU; 287 s was measured for
+      # large-v3-fp16, 95 s for large-v3-turbo.  Cached in the volume from then on.
+      start_period: 360s
+    restart: unless-stopped
+
+  stt-ovms-gpu:
+    image: ${OVMS_IMAGE:-openvino/model_server:weekly@sha256:de1d2eed43e2a7c6c8e4802788e13c6c0a47371fe4984f9cce98d0d47c88af41}
+    profiles: ["stt-ovms"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OVMS_MODEL: ${OVMS_MODEL:-OpenVINO/whisper-large-v3-turbo-fp16-ov}
+      OVMS_DEVICE: GPU
+    # Run as root: the named volume is root-owned and OVMS (uid 5000 in the image) cannot create
+    # /models/.ovms_cache otherwise.  In a rootless or user-namespaced runtime that root is not the host's.
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        exec /ovms/bin/ovms --rest_port 8000
+        --source_model "$$OVMS_MODEL" --model_name "$$(basename "$$OVMS_MODEL")"
+        --model_repository_path /models --cache_dir /models/.ovms_cache
+        --target_device "$$OVMS_DEVICE"
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/accel/accel0:/dev/accel/accel0
+    group_add:
+      - "${RENDER_GID:-992}"
+    volumes:
+      - ovmsgpu:/models
+    ports:
+      - "127.0.0.1:${STT_OVMS_GPU_PORT:-8094}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models | grep -q \"$$(basename \"$$OVMS_MODEL\")\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The GPU compiles far faster than the NPU, but the model download is the same and is
+      # what dominates a cold start.
+      start_period: 360s
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  # Caddy's ACME account key and the issued certificates.  Named on purpose: the checkout
+  # can be replaced wholesale on an upgrade, and a certificate re-issued each time would hit
+  # Let's Encrypt's rate limits within a week.
+  caddy_data:
+  caddy_config:
+  ovmodels:
+  ovmsnpu:
+  ovmsgpu:
+  # stt-cpu's downloaded Hugging Face models.
+  sttcpu:

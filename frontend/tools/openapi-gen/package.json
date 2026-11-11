@@ -1,0 +1,9 @@
+{
+  "name": "keyup-openapi-gen",
+  "private": true,
+  "description": "The generator behind `npm run gen:api-types`, kept apart from the app's own dependencies: openapi-typescript 7 drives the TypeScript 5 compiler API (ts.factory), which the app's TypeScript 7 no longer ships, and npm cannot nest a second typescript under it while the root depends on typescript@7. Nothing here reaches the build or the Docker image.",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,15 @@
+# The build context is ./backend; the Dockerfiles COPY only the lock, pyproject, README,
+# alembic and app/.  Everything below is dead weight in the context (the local .venv alone
+# is ~470 MB) and none of it belongs in an image.
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+*.egg-info
+build
+dist
+tests
+tools

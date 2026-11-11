@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<broadcastify>
+  <feed feedId="2211" status="1">
+    <descr>Example County Fire and EMS</descr>
+    <genre>Fire-EMS</genre>
+    <currentListeners>21</currentListeners>
+    <peakListeners>212</peakListeners>
+  </feed>
+</broadcastify>

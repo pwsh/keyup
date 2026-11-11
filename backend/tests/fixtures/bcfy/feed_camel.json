@@ -1,0 +1,15 @@
+{
+  "feed": {
+    "feedId": 2211,
+    "descr": "Example County Fire and EMS",
+    "genre": "Fire-EMS",
+    "status": 1,
+    "currentListeners": 37,
+    "peakListeners": 212,
+    "totalListeners": 918234,
+    "bitrate": 16,
+    "listenerLimit": 0,
+    "startTime": 1756900000,
+    "archive": 1
+  }
+}

@@ -1,0 +1,65 @@
+# Keyup speech-to-text on Intel silicon: the OpenAI-compatible micro-server from
+# app/stt/ov_server.py, in an image that actually has the drivers for an iGPU and an NPU.
+#
+# The API/worker image (backend/Dockerfile) is python:3.12-slim and has none of the Intel
+# userspace, which is the whole reason this second image exists: the worker keeps talking
+# OpenAI Audio API over the compose network and never imports an OpenVINO symbol.
+#
+# The official runtime image already ships everything the accelerators need — verified in
+# 2026.3.1: intel-opencl-icd 24.48.31907.7, intel-level-zero-gpu 1.6.31907.7,
+# intel-level-zero-npu / intel-driver-compiler-npu / intel-fw-npu 1.32.1.20260422 — so there
+# is no hand-rolled driver install here.  What the image cannot provide is the *kernel* side:
+# i915/xe for the GPU and intel_vpu for the NPU are the host's (on a VM or container, the
+# hypervisor's) job, and the device nodes are passed in.  See docs/STT.md.
+#
+# Pinned deliberately: the driver stack in the image and the openvino-genai wheel are one
+# release train.  Bump both together.
+FROM openvino/ubuntu24_runtime:2026.3.1
+
+USER root
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# ffmpeg decodes the call recording to the 16 kHz mono float32 openvino-genai wants; it is
+# the same system dependency the rest of Keyup already relies on, which is why this
+# image needs no audio wheels at all.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Dependencies first, from the lock (`make lock`; the openvino wheels in it are pinned to the
+# same 2026.3.1 train as the base image), so a source edit does not re-install them.
+COPY requirements-openvino.lock ./
+RUN nice -n 19 pip install --no-cache-dir --require-hashes -r requirements-openvino.lock \
+    && mkdir -p /models \
+    && chown openvino:openvino /models /app
+
+# Then the source; the package alone, offline (hatchling is in the lock).
+COPY --chown=openvino:openvino pyproject.toml README.md ./
+COPY --chown=openvino:openvino app ./app
+RUN nice -n 19 pip install --no-cache-dir --no-deps --no-build-isolation . \
+    && rm -rf build
+
+# Model download + compiled-blob cache.  Mount a volume here: the blob cache is what turns
+# the NPU's minute-long first compile into a sub-second start on every later boot.
+ENV OV_MODEL=OpenVINO/whisper-large-v3-turbo-int8-ov \
+    OV_DEVICE=CPU \
+    OV_CACHE_DIR=/models \
+    OV_CPU_THREADS=4 \
+    OV_CONCURRENCY=1 \
+    HF_HOME=/models/hf
+
+USER openvino
+EXPOSE 8000
+
+# The probe compiles the model on first call, so give it room before the container is
+# declared unhealthy: an NPU compile of large-v3-turbo can take the better part of a minute.
+HEALTHCHECK --interval=30s --timeout=90s --start-period=300s --retries=3 \
+    CMD python3 -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=60).status == 200 else 1)"
+
+CMD ["python3", "-m", "app.stt.ov_server"]

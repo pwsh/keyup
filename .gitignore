@@ -1,0 +1,14 @@
+audio/
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.env.local
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+cache/
+exports/
+.claude/
+.venv-licenses*/
+THIRD-PARTY.md.tmp

@@ -1,0 +1,60 @@
+{
+  "freq": 852137500,
+  "freq_error": -13,
+  "signal": -47,
+  "noise": -102,
+  "source_num": 0,
+  "recorder_num": 3,
+  "tdma_slot": 0,
+  "phase2_tdma": 0,
+  "start_time": 1788012000,
+  "stop_time": 1788012002,
+  "start_time_ms": 1788012000123,
+  "stop_time_ms": 1788012002623,
+  "emergency": 0,
+  "priority": 0,
+  "mode": "P25 Phase 1",
+  "duplex": 0,
+  "encrypted": 0,
+  "call_length": 2,
+  "call_length_ms": 2500,
+  "talkgroup": 1701,
+  "talkgroup_tag": "Law Dispatch",
+  "talkgroup_description": "Example County sheriff primary dispatch",
+  "talkgroup_group_tag": "EX SO DISP",
+  "talkgroup_group": "Example County",
+  "color_code": 0,
+  "audio_type": "digital",
+  "short_name": "EXAMPLE",
+  "call_num": 1,
+  "freqList": [
+    {
+      "freq": 852137500,
+      "time": 1788012000,
+      "pos": 0.0,
+      "len": 2.5,
+      "error_count": 2,
+      "spike_count": 0
+    }
+  ],
+  "srcList": [
+    {
+      "src": 5250057,
+      "time": 1788012000,
+      "pos": 0.0,
+      "emergency": 0,
+      "signal_system": "",
+      "tag": "UNIT 41",
+      "tag_ota": ""
+    },
+    {
+      "src": 5226037,
+      "time": 1788012001,
+      "pos": 1.4,
+      "emergency": 0,
+      "signal_system": "",
+      "tag": "",
+      "tag_ota": ""
+    }
+  ]
+}

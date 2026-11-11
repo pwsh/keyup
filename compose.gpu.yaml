@@ -1,0 +1,66 @@
+# Optional overlay: whisper on an NVIDIA GPU, as a Speaches CUDA container beside the stack.
+# Not used unless you ask for it — neither file nor profile is read by a plain `docker compose`.
+#
+#   # .env next to compose.yaml
+#   COMPOSE_FILE=compose.yaml:compose.gpu.yaml
+#   COMPOSE_PROFILES=stt-gpu            # or stt-cpu,stt-gpu to keep the CPU one as failover
+#
+# Needs the NVIDIA driver and the NVIDIA Container Toolkit on the host (`docker run --rm
+# --gpus all ubuntu nvidia-smi` must work first; the image is built on CUDA 12.9, so the
+# "CUDA Version" that nvidia-smi reports should be 12.9 or later).  Then add a backend ahead of the CPU one
+# (Admin -> Backends, or STT_BACKENDS on a fresh install), e.g.
+#   {"name":"gpu","kind":"openai_compatible","base_url":"http://stt-gpu:8000",
+#    "model":"Systran/faster-whisper-large-v3","concurrency":2,"priority":5}
+# `model` must equal STT_GPU_MODEL.  docs/STT.md §2 has the walkthrough, and how to run the
+# same image on a different machine instead.
+#
+# It works exactly like `stt-cpu` in compose.yaml: the command starts Speaches, asks it to
+# download STT_GPU_MODEL into the `sttgpu` volume, and the healthcheck passes once the model
+# is listed.  large-v3 in float16 needs roughly 4-5 GB of GPU memory.
+services:
+  stt-gpu:
+    image: ${STT_GPU_IMAGE:-ghcr.io/speaches-ai/speaches:0.8.3-cuda@sha256:9abc6968a883e77ead9286c38a6ccf3139dcad518b783deeebb7be2ced50e972}
+    profiles: ["stt-gpu"]
+    environment:
+      STT_GPU_MODEL: ${STT_GPU_MODEL:-Systran/faster-whisper-large-v3}
+      WHISPER__INFERENCE_DEVICE: cuda
+      # float16 is the GPU's native format; int8_float16 halves the memory on small cards.
+      WHISPER__COMPUTE_TYPE: ${STT_GPU_COMPUTE_TYPE:-float16}
+      WHISPER__TTL: "-1"
+      ENABLE_UI: "false"
+      LOG_LEVEL: info
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              # How many GPUs, or replace with `device_ids: ["0"]` to pick one.
+              count: ${STT_GPU_COUNT:-1}
+              capabilities: [gpu]
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        uvicorn --factory speaches.main:create_app & pid=$$!;
+        trap 'kill -TERM $$pid' TERM INT;
+        until curl -sf localhost:8000/health >/dev/null; do
+        kill -0 $$pid 2>/dev/null || exit 1; sleep 1; done;
+        curl -sf -X POST "localhost:8000/v1/models/$$STT_GPU_MODEL" >/dev/null
+        || echo "stt-gpu: could not download $$STT_GPU_MODEL; unhealthy until it is" >&2;
+        wait $$pid; wait $$pid
+    volumes:
+      - sttgpu:/home/ubuntu/.cache/huggingface
+    ports:
+      # Loopback only, for `curl localhost:8099/health`; the worker uses stt-gpu:8000.
+      - "127.0.0.1:${STT_GPU_PORT:-8099}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/v1/models | grep -q \"$$STT_GPU_MODEL\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # large-v3 is ~3 GB to download on the first start.
+      start_period: 900s
+      start_interval: 5s
+    restart: unless-stopped
+
+volumes:
+  sttgpu:

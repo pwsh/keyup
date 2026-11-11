@@ -1,0 +1,30 @@
+{
+  "Feed": [
+    {
+      "id": 2211,
+      "descr": "Example County Fire/EMS",
+      "genre": "Public Safety",
+      "mount": "/examplemount",
+      "Relays": [{ "host": "relay.example.net", "port": "80" }],
+      "status": 1,
+      "bitrate": 32,
+      "Counties": [
+        {
+          "lat": "40.0000000",
+          "lon": "-90.0000000",
+          "coid": "1",
+          "ctid": 1,
+          "name": "Example",
+          "stid": "1",
+          "type": "County",
+          "stateCode": "EX",
+          "stateName": "Example State",
+          "countryCode": "US",
+          "countryName": "United States",
+          "countyDetails": ""
+        }
+      ],
+      "listeners": 12
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<broadcastify>
+  <archives feedId="2211" day="2026-09-01">
+    <archive start="1756702800" end="1756704600" size="3600000">
+      <url>https://archive.broadcastify.com/2211/2026/09/2026090100000.mp3</url>
+    </archive>
+    <archive start="1756704600" end="1756706400" size="3600000">
+      <url>https://archive.broadcastify.com/2211/2026/09/2026090103000.mp3</url>
+    </archive>
+  </archives>
+</broadcastify>

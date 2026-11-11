@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="description" content="%KEYUP_SITE_DESCRIPTION%" />
+    <title>%KEYUP_SITE_NAME% · Keyup</title>
+    <link rel="canonical" href="%KEYUP_PUBLIC_ORIGIN%/" />
+    <meta property="og:site_name" content="Keyup" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="%KEYUP_SITE_NAME% · Keyup" />
+    <meta property="og:description" content="%KEYUP_SITE_DESCRIPTION%" />
+    <meta property="og:url" content="%KEYUP_PUBLIC_ORIGIN%/" />
+    <meta property="og:image" content="%KEYUP_PUBLIC_ORIGIN%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="%KEYUP_SITE_NAME% · Keyup" />
+    <meta name="twitter:description" content="%KEYUP_SITE_DESCRIPTION%" />
+    <meta name="twitter:image" content="%KEYUP_PUBLIC_ORIGIN%/og-image.png" />
+    <script type="application/ld+json">
+      %KEYUP_SITE_JSONLD%
+    </script>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("keyup-theme");
+          const dark =
+            stored === "dark" ||
+            (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+  </head>
+  <body class="h-full">
+    <div id="root" class="h-full">
+      <main>
+        <h1>%KEYUP_SITE_NAME%</h1>
+        <p>%KEYUP_SITE_DESCRIPTION%</p>
+        <p>An independent site, not affiliated with any government agency.</p>
+        <ul>
+          <li><a href="/live">Listen live</a></li>
+          <li><a href="/calls">Browse recent calls</a></li>
+          <li><a href="/talkgroups">Talkgroups</a></li>
+          <li><a href="/stats">Statistics</a></li>
+          <li><a href="/help">Help</a></li>
+        </ul>
+      </main>
+    </div>
+    <script>
+      // The front page's text is for crawlers and scripts-off readers; no other page may flash it.
+      if (location.pathname !== "/" || location.hostname !== %KEYUP_PUBLIC_HOST_JSON%) {
+        document.getElementById("root").textContent = "";
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

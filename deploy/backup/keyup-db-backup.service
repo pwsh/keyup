@@ -1,0 +1,22 @@
+# The nightly database backup (docs/OPERATIONS.md §7).  Install on the Docker host, from
+# the checkout:
+#   install -m 644 deploy/backup/keyup-db-backup.{service,timer} /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now keyup-db-backup.timer
+# KEYUP_DIR is the keyup checkout the script runs from; change it (systemctl edit --full
+# keyup-db-backup.service) if yours is not /opt/keyup.  The dumps go to KEYUP_BACKUP_DIR,
+# outside the checkout, so replacing the checkout never touches them.
+[Unit]
+Description=Keyup database backup (pg_dump + manifest + rotation)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+Environment=KEYUP_DIR=/opt/keyup
+Environment=KEYUP_BACKUP_DIR=/srv/keyup/backups/db
+ExecStart=/bin/bash ${KEYUP_DIR}/deploy/backup/keyup-db-backup.sh
+# Leave the database alone if a dump runs away (the 27 GB database dumps in minutes).
+TimeoutStartSec=3h

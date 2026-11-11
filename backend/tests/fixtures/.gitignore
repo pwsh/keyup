@@ -1,0 +1,3 @@
+# The repository-wide `audio/` rule is for a recorder's capture tree; this one is the
+# synthetic sdrtrunk set that gen_fixtures.py writes, and it is checked in.
+!audio/

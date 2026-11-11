@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env.local
+e2e/screenshots/
+test-results/
+playwright-report/
+e2e/.results/

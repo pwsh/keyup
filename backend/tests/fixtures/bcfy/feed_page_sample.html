@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!-- A hand-written stand-in for a Broadcastify public feed page: only the markup that
+     app/bcfy_stats/public_page.py reads (the detail table and the 24-hour sparkline),
+     with an invented feed and invented counts.  See README.md. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>Example County Fire/EMS Live Audio Feed</title></head>
+<body>
+<div class="listen-detail">
+    <table class="table table-sm listen-detail-table">
+        <tbody>
+            <tr><td class="listen-detail-label">Feed ID</td><td>2211</td></tr>
+            <tr><td class="listen-detail-label">Genre</td><td>Public Safety</td></tr>
+            <tr><td class="listen-detail-label">Status</td><td><span id="lp-detail-status"><span class="portal-status-badge portal-status-badge--online">Online</span></span> <span id="lp-detail-duration" class="listen-detail-duration" data-since="1788495581">(6m)</span></td></tr>
+            <tr><td class="listen-detail-label">Listeners</td><td id="lp-detail-listeners">0</td></tr>
+        </tbody>
+    </table>
+    <div class="listen-sparkline">
+        <div class="listen-sparkline-header">
+            <span class="listen-sparkline-label">Listeners — Last 24 Hours</span>
+            <span class="listen-sparkline-stats">
+                <span>Min <strong>0</strong></span>
+                <span>Max <strong>17</strong></span>
+                <span>Now <strong>0</strong></span>
+            </span>
+        </div>
+        <svg class="listen-sparkline-svg" viewBox="0 0 240 40" preserveAspectRatio="none" role="img" aria-label="24-hour listener history">
+            <line class="listen-sparkline-baseline" x1="0" y1="39.5" x2="240" y2="39.5"></line>
+            <rect class="listen-sparkline-bar" x="0" y="30" width="8" height="9"><title>4 listeners</title></rect><rect class="listen-sparkline-bar" x="10" y="28" width="8" height="11"><title>5 listeners</title></rect><rect class="listen-sparkline-bar" x="20" y="30" width="8" height="9"><title>4 listeners</title></rect><rect class="listen-sparkline-bar" x="30" y="32" width="8" height="7"><title>3 listeners</title></rect><rect class="listen-sparkline-bar" x="40" y="32" width="8" height="7"><title>3 listeners</title></rect><rect class="listen-sparkline-bar" x="50" y="28" width="8" height="11"><title>5 listeners</title></rect><rect class="listen-sparkline-bar" x="60" y="26" width="8" height="13"><title>6 listeners</title></rect><rect class="listen-sparkline-bar" x="70" y="26" width="8" height="13"><title>6 listeners</title></rect><rect class="listen-sparkline-bar" x="80" y="23" width="8" height="16"><title>7 listeners</title></rect><rect class="listen-sparkline-bar" x="90" y="26" width="8" height="13"><title>6 listeners</title></rect><rect class="listen-sparkline-bar" x="100" y="23" width="8" height="16"><title>7 listeners</title></rect><rect class="listen-sparkline-bar" x="110" y="21" width="8" height="18"><title>8 listeners</title></rect><rect class="listen-sparkline-bar" x="120" y="23" width="8" height="16"><title>7 listeners</title></rect><rect class="listen-sparkline-bar" x="130" y="19" width="8" height="20"><title>9 listeners</title></rect><rect class="listen-sparkline-bar" x="140" y="19" width="8" height="20"><title>9 listeners</title></rect><rect class="listen-sparkline-bar" x="150" y="14" width="8" height="25"><title>11 listeners</title></rect><rect class="listen-sparkline-bar" x="160" y="19" width="8" height="20"><title>9 listeners</title></rect><rect class="listen-sparkline-bar" x="170" y="21" width="8" height="18"><title>8 listeners</title></rect><rect class="listen-sparkline-bar" x="180" y="1" width="8" height="38"><title>17 listeners</title></rect><rect class="listen-sparkline-bar" x="190" y="5" width="8" height="34"><title>15 listeners</title></rect><rect class="listen-sparkline-bar" x="200" y="17" width="8" height="22"><title>10 listeners</title></rect><rect class="listen-sparkline-bar" x="210" y="19" width="8" height="20"><title>9 listeners</title></rect><rect class="listen-sparkline-bar" x="220" y="21" width="8" height="18"><title>8 listeners</title></rect><rect class="listen-sparkline-bar" x="230" y="38" width="8" height="1"><title>0 listeners</title></rect>
+        </svg>
+    </div>
+</div>
+</body>
+</html>

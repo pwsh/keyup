@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly Keyup database backup
+
+[Timer]
+# 02:30 local: after the day's traffic peak, ahead of the worker's nightly retention (03:20),
+# gap (03:40) and export-vacuum (03:50) passes so the dump does not compete with them.
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
